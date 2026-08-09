@@ -1,0 +1,19 @@
+/*
+Theme Name: Saman Adhikar Party (समान अधिकार पार्टी)
+Theme URI: https://samanadhikarparty.org
+Author: Saman Adhikar Party IT Cell
+Author URI: https://samanadhikarparty.org
+Description: Official WordPress Theme for Saman Adhikar Party (समान अधिकार पार्टी). Features custom post types for Press Releases, Member Registration with Digital ID Cards, Online Donations with UTR validation & Receipts, Event RSVP Ticket Pass Generator, and Gemini AI Campaign Assistant integration.
+Version: 1.0.0
+License: GNU General Public License v2 or later
+License URI: http://www.gnu.org/licenses/gpl-2.0.html
+Text Domain: saman-adhikar-party
+Tags: political, press-releases, donations, membership, hindi, responsive, custom-post-types
+*/
+
+/* Custom Reset & Utility Tweaks */
+body {
+    font-family: 'Plus Jakarta Sans', 'Tiro Devanagari Hindi', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background-color: rgba(255, 247, 237, 0.3);
+    color: #0f172a;
+}

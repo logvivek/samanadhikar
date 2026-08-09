@@ -1,0 +1,8 @@
+{
+  "name": "Remix Remix Saman Adhikar Party | समान अधिकार पार्टी",
+  "description": "Official political platform \u0026 press portal of Saman Adhikar Party (समान अधिकार पार्टी). Led by Kuldeep Sharma with core focus on Hindu Rashtra Mission, equal rights, press releases, member credentials, and grassroots donations.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
