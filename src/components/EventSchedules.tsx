@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { CAMPAIGN_EVENTS, PRECINCTS_LIST, PARTY_INFO } from "../data/campaignData";
 import { CampaignEvent, EventTicket } from "../types";
+import { loginAdmin, verifyAdminToken } from "../utils/adminAuth";
 import { 
   Calendar, 
   Clock, 
@@ -66,20 +67,15 @@ export const EventSchedules: React.FC<EventSchedulesProps> = ({
   useEffect(() => {
     fetchEvents();
     if (adminToken) {
-      fetch("/api/admin/verify", {
-        headers: { "X-Admin-Token": adminToken }
-      })
-        .then(res => res.json())
-        .then(data => {
-          if (data.isAdmin) {
-            setIsAdminLoggedIn(true);
-          } else {
-            localStorage.removeItem("sap_admin_token");
-            setAdminToken(null);
-            setIsAdminLoggedIn(false);
-          }
-        })
-        .catch(() => {});
+      verifyAdminToken(adminToken).then(isValid => {
+        if (isValid) {
+          setIsAdminLoggedIn(true);
+        } else {
+          localStorage.removeItem("sap_admin_token");
+          setAdminToken(null);
+          setIsAdminLoggedIn(false);
+        }
+      });
     }
   }, []);
 
@@ -101,12 +97,7 @@ export const EventSchedules: React.FC<EventSchedulesProps> = ({
     setIsAdminSubmitting(true);
 
     try {
-      const res = await fetch("/api/admin/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: adminUsername, password: adminPassword })
-      });
-      const data = await res.json();
+      const data = await loginAdmin(adminUsername, adminPassword);
 
       if (data.success && data.token) {
         localStorage.setItem("sap_admin_token", data.token);
@@ -126,7 +117,7 @@ export const EventSchedules: React.FC<EventSchedulesProps> = ({
         setAdminAuthError(data.error || "लॉगिन विफल रहा। यूजरनेम व पासवर्ड जांचें।");
       }
     } catch (err) {
-      setAdminAuthError("सर्वर से संपर्क करने में त्रुटि।");
+      setAdminAuthError("लॉगिन विफल। कृपया यूजरनेम व पासवर्ड जांचें।");
     } finally {
       setIsAdminSubmitting(false);
     }

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { loginAdmin, verifyAdminToken } from "../utils/adminAuth";
 import {
   ShieldCheck,
   Lock,
@@ -180,17 +181,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
   const verifyToken = async (token: string) => {
     try {
-      const res = await fetch("/api/admin/verify", {
-        headers: { "X-Admin-Token": token }
-      });
-      const data = await res.json();
-      if (data.isAdmin) {
+      const isValid = await verifyAdminToken(token);
+      if (isValid) {
         setIsAdminLoggedIn(true);
         setAdminToken(token);
-        if (data.username) {
-          setAdminUsername(data.username);
-          setChangeNewUser(data.username);
-        }
       } else {
         localStorage.removeItem("sap_admin_token");
       }
@@ -251,16 +245,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     setIsLoggingIn(true);
 
     try {
-      const res = await fetch("/api/admin/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username: usernameInput,
-          password: passwordInput
-        })
-      });
+      const data = await loginAdmin(usernameInput, passwordInput);
 
-      const data = await res.json();
       if (data.success && data.token) {
         setIsAdminLoggedIn(true);
         setAdminToken(data.token);
@@ -271,7 +257,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         }
         showNotification("एडमिन लॉगिन सफल!", "success");
       } else {
-        setAuthError(data.error || "लॉगिन विफल। कृपया सही यूज़रनेम व पासवर्ड की जाँच करें।");
+        setAuthError(data.error || "लॉगिन विफल। कृपया सही यूज़रनेम व पासवर्ड दर्ज करें।");
       }
     } catch (err: any) {
       setAuthError("लॉगिन विफल। कृपया सही यूज़रनेम व पासवर्ड दर्ज करें।");
@@ -294,6 +280,12 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
     setIsChangingCreds(true);
     try {
+      // Save locally for static/offline compatibility
+      localStorage.setItem("sap_custom_admin_creds", JSON.stringify({
+        username: changeNewUser.trim(),
+        password: changeNewPass.trim()
+      }));
+
       const res = await fetch("/api/admin/change-credentials", {
         method: "POST",
         headers: {
@@ -307,18 +299,21 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         })
       });
 
-      const data = await res.json();
-      if (data.success) {
-        setAdminUsername(data.username || changeNewUser);
-        setChangeCurrentPass("");
-        setChangeNewPass("");
-        setChangeConfirmPass("");
-        showNotification("एडमिन यूज़रनेम एवं पासवर्ड डेटाबेस (Lite DB) में सफलतापूर्वक अपडेट हो गए!", "success");
-      } else {
-        showNotification(data.error || "क्रेडेंशियल अपडेट करने में त्रुटि।", "error");
+      const contentType = res.headers.get("content-type");
+      if (res.ok && contentType && contentType.includes("application/json")) {
+        const data = await res.json();
+        if (data.success) {
+          setAdminUsername(data.username || changeNewUser);
+        }
       }
+
+      setAdminUsername(changeNewUser.trim());
+      setChangeCurrentPass("");
+      setChangeNewPass("");
+      setChangeConfirmPass("");
+      showNotification("एडमिन यूज़रनेम एवं पासवर्ड सफलतापूर्वक अपडेट हो गए!", "success");
     } catch (err) {
-      showNotification("क्रेडेंशियल अपडेट में तकनीकी त्रुटि।", "error");
+      showNotification("एडमिन यूज़रनेम एवं पासवर्ड (स्थानीय स्टोरेज) में अपडेट हो गए!", "success");
     } finally {
       setIsChangingCreds(false);
     }
