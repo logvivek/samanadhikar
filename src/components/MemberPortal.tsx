@@ -65,71 +65,114 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [activeMemberCard, setActiveMemberCard] = useState<MemberRecord | null>(null);
 
-  // Clean NPCI UPI URL Builder for Member Registration
-  const getCleanUpiPaymentUrl = (noteOverride?: string) => {
-    const payeeVpa = "samanadhikarparty@sbi";
-    const payeeName = "Samanadhikar Party";
-    const txnNote = noteOverride || "Member Registration";
-    const amtStr = membershipFee && Number(membershipFee) > 0 ? Number(membershipFee).toFixed(2) : "100.00";
-
-    return `upi://pay?` +
-      `pa=${encodeURIComponent(payeeVpa)}` +
-      `&pn=${encodeURIComponent(payeeName)}` +
-      `&cu=INR` +
-      `&tn=${encodeURIComponent(txnNote)}` +
-      `${amtStr ? `&am=${encodeURIComponent(amtStr)}` : ''}`;
+  // Unique Transaction Reference ID Generator per NPCI Spec
+  const generateMemberTxnRef = (prefix: string = "SMP") => {
+    const timestamp = Date.now();
+    const randomSuffix = Math.random().toString(36).substring(2, 7).toUpperCase();
+    return `${prefix}${timestamp}${randomSuffix}`;
   };
 
-  const launchMemberPaymentApp = (app: "phonepe" | "paytm" | "gpay" | "upi") => {
+  // Full NPCI Compliant UPI Parameter Builder for Member Registration
+  const getNpciMemberParams = (noteOverride?: string, prefix: string = "SMP") => {
     const payeeVpa = "samanadhikarparty@sbi";
-    const payeeName = "Samanadhikar Party";
-    const txnNote = "Member Registration";
+    const payeeName = encodeURIComponent("Samanadhikar Party");
+    const merchantCode = "8651"; // Political Organizations
+    const txnRef = generateMemberTxnRef(prefix);
+    const txnNote = encodeURIComponent(noteOverride || "Member Registration");
     const amtStr = membershipFee && Number(membershipFee) > 0 ? Number(membershipFee).toFixed(2) : "100.00";
 
-    const cleanParams = `pa=${encodeURIComponent(payeeVpa)}` +
-      `&pn=${encodeURIComponent(payeeName)}` +
+    return `pa=${payeeVpa}` +
+      `&pn=${payeeName}` +
+      `&mc=${merchantCode}` +
+      `&tr=${txnRef}` +
+      `&tn=${txnNote}` +
+      `&am=${amtStr}` +
       `&cu=INR` +
-      `&tn=${encodeURIComponent(txnNote)}` +
-      `${amtStr ? `&am=${encodeURIComponent(amtStr)}` : ''}`;
+      `&mode=02` +
+      `&orgid=000000`;
+  };
 
-    const universalUrl = `upi://pay?${cleanParams}`;
+  // Clean NPCI UPI URL for Member Registration
+  const getCleanUpiPaymentUrl = (noteOverride?: string) => {
+    const params = getNpciMemberParams(noteOverride, "MQR");
+    return `upi://pay?${params}`;
+  };
+
+  const launchMemberPaymentApp = (app: "phonepe" | "paytm" | "gpay" | "upi", noteOverride?: string) => {
+    const userAgent = typeof navigator !== "undefined" ? (navigator.userAgent || navigator.vendor || "") : "";
+    const isAndroid = /android/i.test(userAgent);
+    const isIos = /iphone|ipad|ipod/i.test(userAgent);
+
+    const prefixMap = { phonepe: "MPPE", paytm: "MPTM", gpay: "MGPY", upi: "MUPI" };
+    const params = getNpciMemberParams(noteOverride, prefixMap[app] || "SMP");
+    const universalUrl = `upi://pay?${params}`;
 
     if (app === "phonepe") {
-      const phonepeUrl = `phonepe://pay?${cleanParams}`;
-      try {
-        window.location.href = phonepeUrl;
-        setTimeout(() => { window.location.href = universalUrl; }, 700);
-      } catch (e) {
+      if (isAndroid) {
+        const androidPhonePeIntent = `intent://pay?${params}#Intent;scheme=upi;package=com.phonepe.app;end`;
+        try {
+          window.location.href = androidPhonePeIntent;
+          setTimeout(() => { window.location.href = universalUrl; }, 600);
+        } catch (e) {
+          window.location.href = universalUrl;
+        }
+      } else if (isIos) {
+        const phonepeIosUrl = `phonepe://pay?${params}`;
+        try {
+          window.location.href = phonepeIosUrl;
+          setTimeout(() => { window.location.href = universalUrl; }, 600);
+        } catch (e) {
+          window.location.href = universalUrl;
+        }
+      } else {
         window.location.href = universalUrl;
       }
       return;
     }
 
     if (app === "paytm") {
-      const paytmUrl = `paytmmp://pay?${cleanParams}`;
-      try {
-        window.location.href = paytmUrl;
-        setTimeout(() => { window.location.href = universalUrl; }, 700);
-      } catch (e) {
+      if (isAndroid) {
+        const androidPaytmIntent = `intent://pay?${params}#Intent;scheme=upi;package=net.one97.paytm;end`;
+        try {
+          window.location.href = androidPaytmIntent;
+          setTimeout(() => { window.location.href = universalUrl; }, 600);
+        } catch (e) {
+          window.location.href = universalUrl;
+        }
+      } else if (isIos) {
+        const paytmIosUrl = `paytmmp://pay?${params}`;
+        try {
+          window.location.href = paytmIosUrl;
+          setTimeout(() => { window.location.href = universalUrl; }, 600);
+        } catch (e) {
+          window.location.href = universalUrl;
+        }
+      } else {
         window.location.href = universalUrl;
       }
       return;
     }
 
     if (app === "gpay") {
-      const userAgent = typeof navigator !== "undefined" ? (navigator.userAgent || navigator.vendor || (window as any).opera || "") : "";
-      const isAndroid = /android/i.test(userAgent);
       if (isAndroid) {
-        const androidGPayIntent = `intent://pay?${cleanParams}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`;
+        const androidGPayIntent = `intent://pay?${params}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`;
         try {
           window.location.href = androidGPayIntent;
-          setTimeout(() => { window.location.href = universalUrl; }, 700);
+          setTimeout(() => { window.location.href = universalUrl; }, 600);
         } catch (e) {
           window.location.href = universalUrl;
         }
-        return;
+      } else if (isIos) {
+        const gpayIosUrl = `gpay://upi/pay?${params}`;
+        try {
+          window.location.href = gpayIosUrl;
+          setTimeout(() => { window.location.href = universalUrl; }, 600);
+        } catch (e) {
+          window.location.href = universalUrl;
+        }
+      } else {
+        window.location.href = universalUrl;
       }
-      window.location.href = universalUrl;
       return;
     }
 

@@ -65,79 +65,115 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
 
   const selectedPreset = DONATION_PRESETS.find(p => p.amount === amount);
 
-  // Clean NPCI UPI URL Builder (Peer-to-Organization / Direct SBI VPA transfer)
-  // Stripping restrictive merchant parameters prevents "Invalid Merchant / Security Violation" errors in PhonePe/GPay/Paytm
-  const getCleanUpiUrl = (noteOverride?: string) => {
-    const payeeVpa = "samanadhikarparty@sbi";
-    const payeeName = "Samanadhikar Party";
-    const txnNote = noteOverride || "Website Contribution";
-    const amtStr = amount && Number(amount) > 0 ? Number(amount).toFixed(2) : "";
-
-    return `upi://pay?` +
-      `pa=${encodeURIComponent(payeeVpa)}` +
-      `&pn=${encodeURIComponent(payeeName)}` +
-      `&cu=INR` +
-      `&tn=${encodeURIComponent(txnNote)}` +
-      `${amtStr ? `&am=${encodeURIComponent(amtStr)}` : ''}`;
+  // Unique Transaction Reference ID Generator per NPCI Spec
+  const generateNpciTxnRef = (prefix: string = "SAP") => {
+    const timestamp = Date.now();
+    const randomSuffix = Math.random().toString(36).substring(2, 7).toUpperCase();
+    return `${prefix}${timestamp}${randomSuffix}`;
   };
 
-  // Dedicated multi-stage app launcher with universal fallbacks
-  const launchPaymentApp = (app: "phonepe" | "paytm" | "gpay" | "upi", noteOverride?: string) => {
+  // Full NPCI Compliant UPI Parameter Builder
+  const getNpciParams = (noteOverride?: string, prefix: string = "SAP") => {
     const payeeVpa = "samanadhikarparty@sbi";
-    const payeeName = "Samanadhikar Party";
-    const txnNote = noteOverride || "Website Contribution";
-    const amtStr = amount && Number(amount) > 0 ? Number(amount).toFixed(2) : "";
+    const payeeName = encodeURIComponent("Samanadhikar Party");
+    const merchantCode = "8651"; // Political Organizations
+    const txnRef = generateNpciTxnRef(prefix);
+    const txnNote = encodeURIComponent(noteOverride || "Website Contribution");
+    const amtStr = amount && Number(amount) > 0 ? Number(amount).toFixed(2) : "100.00";
 
-    const cleanParams = `pa=${encodeURIComponent(payeeVpa)}` +
-      `&pn=${encodeURIComponent(payeeName)}` +
+    return `pa=${payeeVpa}` +
+      `&pn=${payeeName}` +
+      `&mc=${merchantCode}` +
+      `&tr=${txnRef}` +
+      `&tn=${txnNote}` +
+      `&am=${amtStr}` +
       `&cu=INR` +
-      `&tn=${encodeURIComponent(txnNote)}` +
-      `${amtStr ? `&am=${encodeURIComponent(amtStr)}` : ''}`;
+      `&mode=02` +
+      `&orgid=000000`;
+  };
 
-    const universalUrl = `upi://pay?${cleanParams}`;
+  // Clean NPCI UPI URL for QR Code & Direct Links
+  const getCleanUpiUrl = (noteOverride?: string) => {
+    const params = getNpciParams(noteOverride, "QR");
+    return `upi://pay?${params}`;
+  };
+
+  // Dedicated multi-stage app launcher as per PhonePe, Paytm, and Google Pay NPCI Direct Integration guidelines
+  const launchPaymentApp = (app: "phonepe" | "paytm" | "gpay" | "upi", noteOverride?: string) => {
+    const userAgent = typeof navigator !== "undefined" ? (navigator.userAgent || navigator.vendor || "") : "";
+    const isAndroid = /android/i.test(userAgent);
+    const isIos = /iphone|ipad|ipod/i.test(userAgent);
+
+    const prefixMap = { phonepe: "PPE", paytm: "PTM", gpay: "GPY", upi: "UPI" };
+    const params = getNpciParams(noteOverride, prefixMap[app] || "SAP");
+    const universalUrl = `upi://pay?${params}`;
 
     if (app === "phonepe") {
-      const phonepeUrl = `phonepe://pay?${cleanParams}`;
-      try {
-        window.location.href = phonepeUrl;
-        setTimeout(() => {
+      if (isAndroid) {
+        const androidPhonePeIntent = `intent://pay?${params}#Intent;scheme=upi;package=com.phonepe.app;end`;
+        try {
+          window.location.href = androidPhonePeIntent;
+          setTimeout(() => { window.location.href = universalUrl; }, 600);
+        } catch (e) {
           window.location.href = universalUrl;
-        }, 700);
-      } catch (e) {
+        }
+      } else if (isIos) {
+        const phonepeIosUrl = `phonepe://pay?${params}`;
+        try {
+          window.location.href = phonepeIosUrl;
+          setTimeout(() => { window.location.href = universalUrl; }, 600);
+        } catch (e) {
+          window.location.href = universalUrl;
+        }
+      } else {
         window.location.href = universalUrl;
       }
       return;
     }
 
     if (app === "paytm") {
-      const paytmUrl = `paytmmp://pay?${cleanParams}`;
-      try {
-        window.location.href = paytmUrl;
-        setTimeout(() => {
+      if (isAndroid) {
+        const androidPaytmIntent = `intent://pay?${params}#Intent;scheme=upi;package=net.one97.paytm;end`;
+        try {
+          window.location.href = androidPaytmIntent;
+          setTimeout(() => { window.location.href = universalUrl; }, 600);
+        } catch (e) {
           window.location.href = universalUrl;
-        }, 700);
-      } catch (e) {
+        }
+      } else if (isIos) {
+        const paytmIosUrl = `paytmmp://pay?${params}`;
+        try {
+          window.location.href = paytmIosUrl;
+          setTimeout(() => { window.location.href = universalUrl; }, 600);
+        } catch (e) {
+          window.location.href = universalUrl;
+        }
+      } else {
         window.location.href = universalUrl;
       }
       return;
     }
 
     if (app === "gpay") {
-      const userAgent = typeof navigator !== "undefined" ? (navigator.userAgent || navigator.vendor || (window as any).opera || "") : "";
-      const isAndroid = /android/i.test(userAgent);
       if (isAndroid) {
-        const androidGPayIntent = `intent://pay?${cleanParams}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`;
+        const androidGPayIntent = `intent://pay?${params}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`;
         try {
           window.location.href = androidGPayIntent;
-          setTimeout(() => {
-            window.location.href = universalUrl;
-          }, 700);
+          setTimeout(() => { window.location.href = universalUrl; }, 600);
         } catch (e) {
           window.location.href = universalUrl;
         }
-        return;
+      } else if (isIos) {
+        const gpayIosUrl = `gpay://upi/pay?${params}`;
+        try {
+          window.location.href = gpayIosUrl;
+          setTimeout(() => { window.location.href = universalUrl; }, 600);
+        } catch (e) {
+          window.location.href = universalUrl;
+        }
+      } else {
+        window.location.href = universalUrl;
       }
-      window.location.href = universalUrl;
       return;
     }
 
