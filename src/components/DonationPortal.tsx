@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import paymentQrImg from "../assets/images/payment_upi_qr.jpg";
 import { DONATION_PRESETS, PRECINCTS_LIST, PARTY_INFO } from "../data/campaignData";
 import { DonationReceipt } from "../types";
 import { validateUtrNumber } from "../utils/utrValidation";
@@ -64,12 +65,12 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
 
   const selectedPreset = DONATION_PRESETS.find(p => p.amount === amount);
 
-  // NPCI Spec compliant UPI URI builder for samanadhikarparty@sbi
+  // NPCI Spec compliant UPI URI builder with proper URL-encoding (%40 for @) & mandatory merchant tags
   const getUpiUrl = (app: "phonepe" | "paytm" | "gpay" | "upi") => {
-    const vpa = "samanadhikarparty@sbi";
+    const vpa = encodeURIComponent("samanadhikarparty@sbi"); // samanadhikarparty%40sbi
     const name = encodeURIComponent("Saman Adhikar Party");
     const note = encodeURIComponent(`Donation Saman Adhikar Party`);
-    const amtStr = Number(amount).toFixed(2);
+    const amtStr = Number(amount || 0).toFixed(2);
     const txnId = `SAP${Date.now()}`;
     const mc = "8699";
     const query = `pa=${vpa}&pn=${name}&mc=${mc}&tr=${txnId}&tn=${note}&am=${amtStr}&cu=INR&mode=02`;
@@ -78,6 +79,14 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
     if (app === "paytm") return `paytmmp://pay?${query}`;
     if (app === "gpay") return `gpay://upi/pay?${query}`;
     return `upi://pay?${query}`;
+  };
+
+  const getStandardUpiUrl = () => {
+    const vpa = encodeURIComponent("samanadhikarparty@sbi");
+    const name = encodeURIComponent("Samanadhikar Party");
+    const amtStr = Number(amount || 0).toFixed(2);
+    const txnId = `SAP${Date.now()}`;
+    return `upi://pay?pa=${vpa}&pn=${name}&am=${amtStr}&cu=INR&mc=8699&tr=${txnId}`;
   };
 
   const handleCopy = (text: string, fieldName: string) => {
@@ -573,11 +582,73 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
             </div>
 
             {/* Payment Details Container */}
-            <div className="bg-orange-50/80 border-2 border-orange-200 rounded-2xl p-6 space-y-5">
+            <div className="bg-orange-50/80 border-2 border-orange-200 rounded-2xl p-5 sm:p-6 space-y-6">
               
+              {/* Official UPI Scanner Card */}
+              <div className="bg-white border-2 border-orange-300 rounded-2xl p-4 sm:p-5 shadow-md flex flex-col md:flex-row items-center gap-6">
+                <div className="relative group shrink-0">
+                  <div className="p-2 bg-gradient-to-b from-amber-400 via-orange-500 to-amber-600 rounded-2xl shadow-xl border border-orange-300">
+                    <img
+                      src={paymentQrImg || "/images/payment_upi_qr.jpg"}
+                      alt="समान अधिकार पार्टी - अधिकृत UPI QR Scanner"
+                      className="w-48 sm:w-56 h-auto rounded-xl object-contain bg-white border border-amber-200 shadow-inner"
+                      referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        const target = e.currentTarget;
+                        if (!target.dataset.triedFallback) {
+                          target.dataset.triedFallback = "true";
+                          target.src = "/images/payment_upi_qr.jpg";
+                        }
+                      }}
+                    />
+                  </div>
+                  <div className="absolute -bottom-2.5 left-1/2 transform -translate-x-1/2 bg-orange-950 text-amber-300 text-[10px] font-black px-3 py-1 rounded-full border border-amber-400/50 shadow-md whitespace-nowrap">
+                    ✓ 100% Verified SBI QR Scanner
+                  </div>
+                </div>
+
+                <div className="space-y-3 text-center md:text-left flex-1">
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-orange-700 bg-orange-100 px-2.5 py-1 rounded-full border border-orange-200 inline-block mb-1">
+                      Official UPI Scanner
+                    </span>
+                    <h4 className="text-base sm:text-lg font-black text-orange-950 leading-tight">
+                      क्यूआर कोड स्कैन करके सीधे सहयोग राशि (₹{amount.toLocaleString("hi-IN")}) स्थानांतरित करें
+                    </h4>
+                    <p className="text-xs text-slate-600 font-bold mt-1">
+                      PhonePe, Google Pay, Paytm, BHIM अथवा किसी भी UPI ऐप से ऊपर प्रदर्शित QR कोड को सीधे स्कैन करें।
+                    </p>
+                  </div>
+
+                  <div className="p-3 bg-amber-50/80 rounded-xl border border-amber-200 flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <div>
+                      <span className="text-[10px] text-slate-500 block font-bold uppercase">स्टेट बैंक अधिकृत UPI VPA:</span>
+                      <strong className="text-orange-950 font-mono text-sm">samanadhikarparty@sbi</strong>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleCopy("samanadhikarparty@sbi", "upi")}
+                      className="px-3 py-1.5 text-xs font-black text-white bg-orange-600 hover:bg-orange-700 rounded-xl shadow cursor-pointer transition-all active:scale-95 flex items-center space-x-1"
+                    >
+                      {copiedField === "upi" ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-white" />
+                          <span>कॉपी हुआ!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5 text-white" />
+                          <span>UPI ID कॉपी करें</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               <div className="space-y-4">
                 <div className="flex items-center space-x-2 font-black text-orange-950 text-sm">
-                  <BadgeCheck className="w-5 h-5 text-emerald-600" />
+                  <BadgeCheck className="w-5 h-5 text-emerald-600 shrink-0" />
                   <span>समान अधिकार पार्टी - SBI बैंक अधिकृत UPI ID: <span className="font-mono text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-300">samanadhikarparty@sbi</span></span>
                 </div>
 
@@ -591,25 +662,28 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
                       <span className="text-xs bg-purple-200 text-purple-900 px-2 py-0.5 rounded font-mono">vpa: samanadhikarparty@sbi</span>
                     </div>
                     <p className="text-slate-700 font-bold text-xs">
-                      फोनपे ऐप में भुगतान के लिए आवश्यक पैरामीटर (pa, pn, am, cu, tr) स्वचालित रूप से भेज दिए गए हैं।
+                      फोनपे ऐप हेतु URL Encoding (%40) व मर्चेंट पैरामीटर (pa, pn, mc, tr, tn, am, cu) सुरक्षित रूप से कॉन्फ़िगर किए गए हैं।
                     </p>
-                    <div className="flex flex-wrap gap-2 pt-1">
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
                       <button
                         type="button"
                         onClick={() => handleOpenUpiAndGenerateReceipt("phonepe")}
                         className="px-5 py-3 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-black text-xs shadow-md flex items-center space-x-2 cursor-pointer hover:scale-105 active:scale-95 transition-all"
                       >
                         <Smartphone className="w-4 h-4 text-white" />
-                        <span>PhonePe ऐप खोलें एवं रसीद पाएं (Pay ₹{amount})</span>
+                        <span>PhonePe ऐप खोलें (Pay ₹{amount})</span>
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => handleOpenUpiAndGenerateReceipt("upi")}
-                        className="px-4 py-3 rounded-xl bg-purple-100 hover:bg-purple-200 text-purple-950 font-bold text-xs border border-purple-300 cursor-pointer"
+                      <a
+                        href={getStandardUpiUrl()}
+                        onClick={() => setTimeout(() => handleConfirmAndGenerateReceipt(), 800)}
+                        className="px-4 py-3 rounded-xl bg-purple-100 hover:bg-purple-200 text-purple-950 font-black text-xs border border-purple-300 flex items-center space-x-1 transition-all"
                       >
-                        <span>अन्य UPI App खोलें</span>
-                      </button>
+                        <span>Direct Link (PhonePe / UPI)</span>
+                      </a>
                     </div>
+                    <p className="text-[10px] text-purple-900 font-semibold italic bg-purple-100/60 p-2 rounded-lg border border-purple-200">
+                      💡 नोट: यदि आप कंप्यूटर/डेस्कटॉप पर हैं, तो ऐप लिंक लॉन्च नहीं होगा। कृपया अपने मोबाइल फोन के PhonePe ऐप से ऊपर दिए गए official SBI QR Code को सीधे स्कैन करें।
+                    </p>
                   </div>
                 )}
 
@@ -623,25 +697,28 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
                       <span className="text-xs bg-sky-200 text-sky-900 px-2 py-0.5 rounded font-mono">vpa: samanadhikarparty@sbi</span>
                     </div>
                     <p className="text-slate-700 font-bold text-xs">
-                      पेटीएम ऐप में 'Pay Money' हेतु अधिकृत UPI ID samanadhikarparty@sbi व सटीक पैरामीटर कॉन्फ़िगर किए गए हैं।
+                      पेटीएम ऐप में 'Pay Money' हेतु अधिकृत VPA samanadhikarparty@sbi व सटीक पैरामीटर कॉन्फ़िगर किए गए हैं।
                     </p>
-                    <div className="flex flex-wrap gap-2 pt-1">
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
                       <button
                         type="button"
                         onClick={() => handleOpenUpiAndGenerateReceipt("paytm")}
                         className="px-5 py-3 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-black text-xs shadow-md flex items-center space-x-2 cursor-pointer hover:scale-105 active:scale-95 transition-all"
                       >
                         <Smartphone className="w-4 h-4 text-white" />
-                        <span>Paytm ऐप खोलें एवं रसीद पाएं (Pay ₹{amount})</span>
+                        <span>Paytm ऐप खोलें (Pay ₹{amount})</span>
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => handleOpenUpiAndGenerateReceipt("upi")}
-                        className="px-4 py-3 rounded-xl bg-sky-100 hover:bg-sky-200 text-sky-950 font-bold text-xs border border-sky-300 cursor-pointer"
+                      <a
+                        href={getStandardUpiUrl()}
+                        onClick={() => setTimeout(() => handleConfirmAndGenerateReceipt(), 800)}
+                        className="px-4 py-3 rounded-xl bg-sky-100 hover:bg-sky-200 text-sky-950 font-black text-xs border border-sky-300 flex items-center space-x-1 transition-all"
                       >
-                        <span>विकल्प: Generic UPI</span>
-                      </button>
+                        <span>Direct Link (Paytm / UPI)</span>
+                      </a>
                     </div>
+                    <p className="text-[10px] text-sky-900 font-semibold italic bg-sky-100/60 p-2 rounded-lg border border-sky-200">
+                      💡 नोट: डेस्कटॉप पर ऐप डीप-लिंक के स्थान पर ऊपर प्रदर्शित SBI QR Code को पेटीएम ऐप से सीधे स्कैन करें।
+                    </p>
                   </div>
                 )}
 
@@ -657,23 +734,26 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
                     <p className="text-slate-700 font-bold text-xs">
                       GPay ऐप खोलकर सीधे समान अधिकार पार्टी के स्टेट बैंक खाते (<span className="font-mono">samanadhikarparty@sbi</span>) में भुगतान करें।
                     </p>
-                    <div className="flex flex-wrap gap-2 pt-1">
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
                       <button
                         type="button"
                         onClick={() => handleOpenUpiAndGenerateReceipt("gpay")}
                         className="px-5 py-3 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-black text-xs shadow-md flex items-center space-x-2 cursor-pointer hover:scale-105 active:scale-95 transition-all"
                       >
                         <Smartphone className="w-4 h-4 text-white" />
-                        <span>Google Pay खोलें एवं रसीद पाएं (Pay ₹{amount})</span>
+                        <span>Google Pay खोलें (Pay ₹{amount})</span>
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => handleOpenUpiAndGenerateReceipt("upi")}
-                        className="px-4 py-3 rounded-xl bg-teal-100 hover:bg-teal-200 text-teal-950 font-bold text-xs border border-teal-300 cursor-pointer"
+                      <a
+                        href={getStandardUpiUrl()}
+                        onClick={() => setTimeout(() => handleConfirmAndGenerateReceipt(), 800)}
+                        className="px-4 py-3 rounded-xl bg-teal-100 hover:bg-teal-200 text-teal-950 font-black text-xs border border-teal-300 flex items-center space-x-1 transition-all"
                       >
-                        <span>विकल्प: All UPI Apps</span>
-                      </button>
+                        <span>Direct Link (GPay / UPI)</span>
+                      </a>
                     </div>
+                    <p className="text-[10px] text-teal-900 font-semibold italic bg-teal-100/60 p-2 rounded-lg border border-teal-200">
+                      💡 नोट: यदि आप कंप्यूटर पर हैं, तो अपने मोबाइल के Google Pay ऐप से SBI QR Code स्कैन करें।
+                    </p>
                   </div>
                 )}
 

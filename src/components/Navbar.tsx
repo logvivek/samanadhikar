@@ -104,13 +104,17 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <div className="w-13 h-13 rounded-xl bg-gradient-to-tr from-amber-500 via-orange-500 to-amber-600 p-0.5 shadow-md group-hover:scale-105 transition-transform overflow-hidden flex items-center justify-center shrink-0">
               <img 
-                src="/images/gou_mata.jpg" 
+                src={gouMataImg || "/images/gou_mata.jpg"} 
                 alt="जय गौ माता - कामधेनु" 
+                referrerPolicy="no-referrer"
                 onError={(e) => {
                   const target = e.currentTarget;
                   if (!target.dataset.triedFallback) {
                     target.dataset.triedFallback = "true";
-                    target.src = gouMataImg || "/images/gou_mata_kamadhenu.jpg";
+                    target.src = "/images/gou_mata.jpg";
+                  } else if (target.dataset.triedFallback === "true") {
+                    target.dataset.triedFallback = "true2";
+                    target.src = "/images/gou_mata_kamadhenu.jpg";
                   } else {
                     target.src = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><rect width='100%' height='100%' fill='%23ea580c'/><text x='50%' y='55%' dominant-baseline='middle' text-anchor='middle' fill='white' font-size='24' font-family='sans-serif' font-weight='bold'>SAP</text></svg>";
                   }
