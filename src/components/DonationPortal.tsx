@@ -68,7 +68,7 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
   // Clean NPCI UPI URL Builder (Peer-to-Organization / Direct SBI VPA transfer)
   // Stripping restrictive merchant parameters prevents "Invalid Merchant / Security Violation" errors in PhonePe/GPay/Paytm
   const getCleanUpiUrl = (noteOverride?: string) => {
-    const payeeVpa = "samanadhikarparty@sbi";
+    const payeeVpa = "7866015900@ybl";
     const payeeName = "Samanadhikar Party";
     const txnNote = noteOverride || "Website Contribution";
     const amtStr = amount && Number(amount) > 0 ? Number(amount).toFixed(2) : "";
@@ -83,7 +83,7 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
 
   // Dedicated multi-stage app launcher with universal fallbacks
   const launchPaymentApp = (app: "phonepe" | "paytm" | "gpay" | "upi", noteOverride?: string) => {
-    const payeeVpa = "samanadhikarparty@sbi";
+    const payeeVpa = "7866015900@ybl";
     const payeeName = "Samanadhikar Party";
     const txnNote = noteOverride || "Website Contribution";
     const amtStr = amount && Number(amount) > 0 ? Number(amount).toFixed(2) : "";
@@ -665,18 +665,18 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
                       किसी भी UPI ऐप (PhonePe, Google Pay, Paytm, BHIM) से QR कोड सीधे स्कैन करके ₹{amount.toLocaleString("hi-IN")} का भुगतान करें
                     </h4>
                     <p className="text-xs text-slate-600 font-bold mt-1">
-                      क्यूआर कोड में समान अधिकार पार्टी का स्टेट बैंक VPA (<span className="font-mono text-orange-900">samanadhikarparty@sbi</span>) एवं सटीक देय राशि (₹{amount}) स्वचालित रूप से प्री-फिल्ड है।
+                      क्यूआर कोड में समान अधिकार पार्टी का अधिकृत UPI VPA (<span className="font-mono text-orange-900">7866015900@ybl</span>) एवं सटीक देय राशि (₹{amount}) स्वचालित रूप से प्री-फिल्ड है।
                     </p>
                   </div>
 
                   <div className="p-3 bg-amber-50/80 rounded-xl border border-amber-200 flex flex-wrap items-center justify-between gap-2 text-xs">
                     <div>
-                      <span className="text-[10px] text-slate-500 block font-bold uppercase">स्टेट बैंक अधिकृत UPI VPA:</span>
-                      <strong className="text-orange-950 font-mono text-sm">samanadhikarparty@sbi</strong>
+                      <span className="text-[10px] text-slate-500 block font-bold uppercase">अधिकृत UPI VPA:</span>
+                      <strong className="text-orange-950 font-mono text-sm">7866015900@ybl</strong>
                     </div>
                     <button
                       type="button"
-                      onClick={() => handleCopy("samanadhikarparty@sbi", "upi")}
+                      onClick={() => handleCopy("7866015900@ybl", "upi")}
                       className="px-3 py-1.5 text-xs font-black text-white bg-orange-600 hover:bg-orange-700 rounded-xl shadow cursor-pointer transition-all active:scale-95 flex items-center space-x-1"
                     >
                       {copiedField === "upi" ? (
@@ -698,7 +698,7 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
               <div className="space-y-4">
                 <div className="flex items-center space-x-2 font-black text-orange-950 text-sm">
                   <BadgeCheck className="w-5 h-5 text-emerald-600 shrink-0" />
-                  <span>समान अधिकार पार्टी - SBI बैंक अधिकृत UPI ID: <span className="font-mono text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-300">samanadhikarparty@sbi</span></span>
+                  <span>समान अधिकार पार्टी - अधिकृत UPI ID: <span className="font-mono text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-300">7866015900@ybl</span></span>
                 </div>
 
                 {paymentMethod === "phonepe" && (
@@ -708,7 +708,7 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
                         <span className="px-2.5 py-1 rounded-lg bg-purple-700 text-white text-xs font-black shadow-sm">PhonePe Gateway</span>
                         <span>फोनपे ऐप द्वारा ₹{amount} का भुगतान करें</span>
                       </div>
-                      <span className="text-xs bg-purple-200 text-purple-900 px-2 py-0.5 rounded font-mono">vpa: samanadhikarparty@sbi</span>
+                      <span className="text-xs bg-purple-200 text-purple-900 px-2 py-0.5 rounded font-mono">vpa: 7866015900@ybl</span>
                     </div>
                     <p className="text-slate-700 font-bold text-xs">
                       सुरक्षित VPA व शुद्ध NPCI UPI स्टैंडर्ड का उपयोग करके फोनपे ऐप खोलें।
@@ -742,10 +742,10 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
                         <span className="px-2.5 py-1 rounded-lg bg-sky-600 text-white text-xs font-black shadow-sm">Paytm Gateway</span>
                         <span>पेटीएम ऐप द्वारा ₹{amount} का भुगतान करें</span>
                       </div>
-                      <span className="text-xs bg-sky-200 text-sky-900 px-2 py-0.5 rounded font-mono">vpa: samanadhikarparty@sbi</span>
+                      <span className="text-xs bg-sky-200 text-sky-900 px-2 py-0.5 rounded font-mono">vpa: 7866015900@ybl</span>
                     </div>
                     <p className="text-slate-700 font-bold text-xs">
-                      पेटीएम ऐप में 'Pay Money / UPI Transfer' द्वारा सीधे पार्टी के SBI खाते (<span className="font-mono">samanadhikarparty@sbi</span>) में राशि हस्तांतरित करें।
+                      पेटीएम ऐप में 'Pay Money / UPI Transfer' द्वारा सीधे पार्टी के खाते (<span className="font-mono">7866015900@ybl</span>) में राशि हस्तांतरित करें।
                     </p>
                     <div className="flex flex-wrap items-center gap-2 pt-1">
                       <button
@@ -776,10 +776,10 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
                         <span className="px-2.5 py-1 rounded-lg bg-teal-700 text-white text-xs font-black shadow-sm">Google Pay</span>
                         <span>गूगल पे (GPay) द्वारा ₹{amount} ट्रांसफर करें</span>
                       </div>
-                      <span className="text-xs bg-teal-200 text-teal-900 px-2 py-0.5 rounded font-mono">vpa: samanadhikarparty@sbi</span>
+                      <span className="text-xs bg-teal-200 text-teal-900 px-2 py-0.5 rounded font-mono">vpa: 7866015900@ybl</span>
                     </div>
                     <p className="text-slate-700 font-bold text-xs">
-                      गूगल पे ऐप खोलकर सीधे समान अधिकार पार्टी के स्टेट बैंक खाते (<span className="font-mono">samanadhikarparty@sbi</span>) में भुगतान करें।
+                      गूगल पे ऐप खोलकर सीधे समान अधिकार पार्टी के खाते (<span className="font-mono">7866015900@ybl</span>) में भुगतान करें।
                     </p>
                     <div className="flex flex-wrap items-center gap-2 pt-1">
                       <button
