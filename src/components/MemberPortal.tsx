@@ -67,7 +67,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
 
   // Clean NPCI UPI URL Builder for Member Registration
   const getCleanUpiPaymentUrl = (noteOverride?: string) => {
-    const payeeVpa = "7866015900@ybl";
+    const payeeVpa = "samanadhikarparty@sbi";
     const payeeName = "Samanadhikar Party";
     const txnNote = noteOverride || "Member Registration";
     const amtStr = membershipFee && Number(membershipFee) > 0 ? Number(membershipFee).toFixed(2) : "100.00";
@@ -81,7 +81,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
   };
 
   const launchMemberPaymentApp = (app: "phonepe" | "paytm" | "gpay" | "upi") => {
-    const payeeVpa = "7866015900@ybl";
+    const payeeVpa = "samanadhikarparty@sbi";
     const payeeName = "Samanadhikar Party";
     const txnNote = "Member Registration";
     const amtStr = membershipFee && Number(membershipFee) > 0 ? Number(membershipFee).toFixed(2) : "100.00";
@@ -614,7 +614,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
                         <div className="p-2.5 bg-amber-50 rounded-xl border border-amber-200 flex flex-wrap items-center justify-between gap-2 text-xs">
                           <div>
                             <span className="text-[9px] text-slate-500 block font-bold uppercase">UPI VPA:</span>
-                            <strong className="text-orange-950 font-mono text-xs">7866015900@ybl</strong>
+                            <strong className="text-orange-950 font-mono text-xs">samanadhikarparty@sbi</strong>
                           </div>
                           <button
                             type="button"

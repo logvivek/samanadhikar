@@ -26,7 +26,7 @@ export const PARTY_INFO = {
     branch: "सदर बाजार, आगरा (Sadar Bazar, Agra)",
     accountNo: "34465318239",
     ifscCode: "SBIN0002467",
-    upiId: "7866015900@ybl",
+    upiId: "samanadhikarparty@sbi",
     accountHolder: "SAMAN ADHIKAR PARTY"
   },
   bioHeadline: "राष्ट्र निर्माण, सामाजिक समानता एवं सनातन संस्कृति की रक्षा हेतु संकल्पबद्ध",
