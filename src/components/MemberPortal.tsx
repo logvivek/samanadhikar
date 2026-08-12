@@ -65,33 +65,79 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [activeMemberCard, setActiveMemberCard] = useState<MemberRecord | null>(null);
 
-  // Function to generate a completely unique transaction ID (under 35 chars)
-  const generateTxnRefId = () => {
-    const timestamp = Date.now();
-    const randomHex = Math.random().toString(16).substring(2, 8).toUpperCase();
-    return `SMP${timestamp}${randomHex}`;
+  // Clean NPCI UPI URL Builder for Member Registration
+  const getCleanUpiPaymentUrl = (noteOverride?: string) => {
+    const payeeVpa = "samanadhikarparty@sbi";
+    const payeeName = "Samanadhikar Party";
+    const txnNote = noteOverride || "Member Registration";
+    const amtStr = membershipFee && Number(membershipFee) > 0 ? Number(membershipFee).toFixed(2) : "100.00";
+
+    return `upi://pay?` +
+      `pa=${encodeURIComponent(payeeVpa)}` +
+      `&pn=${encodeURIComponent(payeeName)}` +
+      `&cu=INR` +
+      `&tn=${encodeURIComponent(txnNote)}` +
+      `${amtStr ? `&am=${encodeURIComponent(amtStr)}` : ''}`;
+  };
+
+  const launchMemberPaymentApp = (app: "phonepe" | "paytm" | "gpay" | "upi") => {
+    const payeeVpa = "samanadhikarparty@sbi";
+    const payeeName = "Samanadhikar Party";
+    const txnNote = "Member Registration";
+    const amtStr = membershipFee && Number(membershipFee) > 0 ? Number(membershipFee).toFixed(2) : "100.00";
+
+    const cleanParams = `pa=${encodeURIComponent(payeeVpa)}` +
+      `&pn=${encodeURIComponent(payeeName)}` +
+      `&cu=INR` +
+      `&tn=${encodeURIComponent(txnNote)}` +
+      `${amtStr ? `&am=${encodeURIComponent(amtStr)}` : ''}`;
+
+    const universalUrl = `upi://pay?${cleanParams}`;
+
+    if (app === "phonepe") {
+      const phonepeUrl = `phonepe://pay?${cleanParams}`;
+      try {
+        window.location.href = phonepeUrl;
+        setTimeout(() => { window.location.href = universalUrl; }, 700);
+      } catch (e) {
+        window.location.href = universalUrl;
+      }
+      return;
+    }
+
+    if (app === "paytm") {
+      const paytmUrl = `paytmmp://pay?${cleanParams}`;
+      try {
+        window.location.href = paytmUrl;
+        setTimeout(() => { window.location.href = universalUrl; }, 700);
+      } catch (e) {
+        window.location.href = universalUrl;
+      }
+      return;
+    }
+
+    if (app === "gpay") {
+      const userAgent = typeof navigator !== "undefined" ? (navigator.userAgent || navigator.vendor || (window as any).opera || "") : "";
+      const isAndroid = /android/i.test(userAgent);
+      if (isAndroid) {
+        const androidGPayIntent = `intent://pay?${cleanParams}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`;
+        try {
+          window.location.href = androidGPayIntent;
+          setTimeout(() => { window.location.href = universalUrl; }, 700);
+        } catch (e) {
+          window.location.href = universalUrl;
+        }
+        return;
+      }
+      window.location.href = universalUrl;
+      return;
+    }
+
+    window.location.href = universalUrl;
   };
 
   const getUpiPaymentUrl = (app: "phonepe" | "paytm" | "gpay" | "upi") => {
-    const payeeVpa = "samanadhikarparty@sbi";
-    const payeeName = "Samanadhikar Party";
-    const merchantCode = "8651"; // Political Organizations
-    const txnNote = "Member Registration";
-    const txnRefId = generateTxnRefId();
-    const amtStr = membershipFee ? Number(membershipFee).toFixed(2) : "";
-
-    const query = `pa=${encodeURIComponent(payeeVpa)}` +
-      `&pn=${encodeURIComponent(payeeName)}` +
-      `&mc=${encodeURIComponent(merchantCode)}` +
-      `&tr=${encodeURIComponent(txnRefId)}` +
-      `&tn=${encodeURIComponent(txnNote)}` +
-      `&cu=INR` +
-      `${amtStr ? `&am=${encodeURIComponent(amtStr)}` : ''}`;
-
-    if (app === "phonepe") return `phonepe://pay?${query}`;
-    if (app === "paytm") return `paytmmp://pay?${query}`;
-    if (app === "gpay") return `gpay://upi/pay?${query}`;
-    return `upi://pay?${query}`;
+    return getCleanUpiPaymentUrl();
   };
   const [membersList, setMembersList] = useState<MemberRecord[]>([]);
   const [totalCount, setTotalCount] = useState<number>(1450);
@@ -450,12 +496,12 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
                     
                     {paymentApp === "phonepe" && (
                       <div className="p-3 bg-purple-50 border border-purple-200 rounded-xl space-y-2">
-                        <div className="font-black text-purple-950 text-xs">PhonePe Gateway (Political Org Merchant 8651 & Encoded VPA):</div>
+                        <div className="font-black text-purple-950 text-xs">PhonePe Gateway (Direct VPA Transfer):</div>
                         <div className="flex flex-wrap items-center gap-2">
                           <button
                             type="button"
                             onClick={() => {
-                              window.location.href = getUpiPaymentUrl("phonepe");
+                              launchMemberPaymentApp("phonepe");
                             }}
                             className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-black text-xs shadow cursor-pointer hover:scale-105 transition-all"
                           >
@@ -463,7 +509,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
                             <span>PhonePe ऐप खोलें (Pay ₹{membershipFee})</span>
                           </button>
                           <a
-                            href={getUpiPaymentUrl("upi")}
+                            href={getCleanUpiPaymentUrl()}
                             className="px-3 py-2 rounded-xl bg-purple-100 hover:bg-purple-200 text-purple-950 font-black text-xs border border-purple-300"
                           >
                             Direct Link (PhonePe / UPI)
@@ -482,7 +528,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
                           <button
                             type="button"
                             onClick={() => {
-                              window.location.href = getUpiPaymentUrl("paytm");
+                              launchMemberPaymentApp("paytm");
                             }}
                             className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-black text-xs shadow cursor-pointer hover:scale-105 transition-all"
                           >
@@ -490,7 +536,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
                             <span>Paytm ऐप खोलें (Pay ₹{membershipFee})</span>
                           </button>
                           <a
-                            href={getUpiPaymentUrl("upi")}
+                            href={getCleanUpiPaymentUrl()}
                             className="px-3 py-2 rounded-xl bg-sky-100 hover:bg-sky-200 text-sky-950 font-black text-xs border border-sky-300"
                           >
                             Direct Link (Paytm / UPI)
@@ -509,7 +555,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
                           <button
                             type="button"
                             onClick={() => {
-                              window.location.href = getUpiPaymentUrl("gpay");
+                              launchMemberPaymentApp("gpay");
                             }}
                             className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-black text-xs shadow cursor-pointer hover:scale-105 transition-all"
                           >
@@ -517,7 +563,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
                             <span>Google Pay खोलें (Pay ₹{membershipFee})</span>
                           </button>
                           <a
-                            href={getUpiPaymentUrl("upi")}
+                            href={getCleanUpiPaymentUrl()}
                             className="px-3 py-2 rounded-xl bg-teal-100 hover:bg-teal-200 text-teal-950 font-black text-xs border border-teal-300"
                           >
                             Direct Link (GPay / UPI)
@@ -531,10 +577,10 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
 
                     {/* Official UPI Scanner Card */}
                     <div className="bg-white border-2 border-orange-300 rounded-2xl p-4 shadow-md flex flex-col sm:flex-row items-center gap-4">
-                      <div className="relative group shrink-0">
-                        <div className="p-1.5 bg-gradient-to-b from-amber-400 via-orange-500 to-amber-600 rounded-2xl shadow-lg border border-orange-300">
+                      <div className="relative group shrink-0 text-center">
+                        <div className="p-1.5 bg-gradient-to-b from-amber-400 via-orange-500 to-amber-600 rounded-2xl shadow-lg border border-orange-300 inline-block">
                           <img
-                            src={paymentQrImg || "/images/payment_upi_qr.jpg"}
+                            src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(getCleanUpiPaymentUrl())}`}
                             alt="समान अधिकार पार्टी - अधिकृत UPI QR Scanner"
                             className="w-40 sm:w-48 h-auto rounded-xl object-contain bg-white border border-amber-200 shadow-inner"
                             referrerPolicy="no-referrer"
@@ -542,13 +588,13 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
                               const target = e.currentTarget;
                               if (!target.dataset.triedFallback) {
                                 target.dataset.triedFallback = "true";
-                                target.src = "/images/payment_upi_qr.jpg";
+                                target.src = paymentQrImg || "/images/payment_upi_qr.jpg";
                               }
                             }}
                           />
                         </div>
-                        <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 bg-orange-950 text-amber-300 text-[9px] font-black px-2.5 py-0.5 rounded-full border border-amber-400/50 shadow-sm whitespace-nowrap">
-                          ✓ SBI QR Scanner
+                        <div className="mt-1.5 bg-orange-950 text-amber-300 text-[9px] font-black px-2.5 py-0.5 rounded-full border border-amber-400/50 shadow-sm inline-block">
+                          ✓ Verified SBI QR Scanner (₹{membershipFee})
                         </div>
                       </div>
 
@@ -558,10 +604,10 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
                             Official Payment Scanner
                           </span>
                           <h4 className="text-sm font-black text-orange-950 leading-tight">
-                            स्कैनर द्वारा सदस्यता शुल्क ({membershipFee > 0 ? `₹${membershipFee}` : "निःशुल्क"}) ट्रांसफर करें
+                            स्कैनर द्वारा सदस्यता शुल्क ({membershipFee > 0 ? `₹${membershipFee}` : "निःशुल्क"}) सीधे जमा करें
                           </h4>
                           <p className="text-[11px] text-slate-600 font-bold mt-0.5">
-                            PhonePe, Google Pay, Paytm, BHIM अथवा YONO से QR स्कैन करके सीधे आधिकारिक खाते में शुल्क जमा करें।
+                            PhonePe, Google Pay, Paytm, BHIM अथवा YONO से QR कोड सीधे स्कैन करके अधिकृत SBI खाते में सदस्यता शुल्क जमा करें।
                           </p>
                         </div>
 
