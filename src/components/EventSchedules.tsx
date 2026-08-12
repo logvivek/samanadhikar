@@ -26,10 +26,12 @@ import {
 
 interface EventSchedulesProps {
   onAskAiEvent: (eventTitle: string) => void;
+  onRefreshEventsAndPressReleases?: () => void;
 }
 
 export const EventSchedules: React.FC<EventSchedulesProps> = ({
-  onAskAiEvent
+  onAskAiEvent,
+  onRefreshEventsAndPressReleases
 }) => {
   const [eventsList, setEventsList] = useState<CampaignEvent[]>(CAMPAIGN_EVENTS);
   const [selectedType, setSelectedType] = useState<string>("All");
@@ -58,6 +60,7 @@ export const EventSchedules: React.FC<EventSchedulesProps> = ({
   // Add Event Form State
   const [isAddEventModalOpen, setIsAddEventModalOpen] = useState<boolean>(false);
   const [newEventTitle, setNewEventTitle] = useState<string>("");
+  const [newEventCategory, setNewEventCategory] = useState<string>("Karyakram");
   const [newEventDate, setNewEventDate] = useState<string>(new Date().toISOString().split("T")[0]);
   const [newEventTime, setNewEventTime] = useState<string>("सायं 4:00 बजे से");
   const [newEventLocation, setNewEventLocation] = useState<string>("आगरा HQ / जिला कार्यालय");
@@ -180,6 +183,8 @@ export const EventSchedules: React.FC<EventSchedulesProps> = ({
         body: JSON.stringify({
           title: newEventTitle,
           titleHi: newEventTitle,
+          type: newEventCategory,
+          category: newEventCategory,
           date: newEventDate,
           displayDate: newEventDate,
           time: newEventTime,
@@ -188,9 +193,29 @@ export const EventSchedules: React.FC<EventSchedulesProps> = ({
           description: newEventDescription
         })
       });
+
+      // Also publish to Press Releases under Karyakram or Rally category so it shows in Press Releases section
+      await fetch("/api/press-releases", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Admin-Token": activeToken
+        },
+        body: JSON.stringify({
+          title: newEventTitle,
+          category: newEventCategory,
+          date: newEventDate,
+          location: newEventLocation,
+          spokesperson: "कुलदीप शर्मा (राष्ट्रीय अध्यक्ष)",
+          content: `${newEventTitle} - दिनांक: ${newEventDate}, समय: ${newEventTime}, स्थान: ${newEventLocation}। ${newEventDescription || 'समान अधिकार पार्टी का विशाल आयोजन।'}`,
+          isUrgent: true
+        })
+      });
+
       const data = await res.json();
       if (data.success) {
         fetchEvents();
+        if (onRefreshEventsAndPressReleases) onRefreshEventsAndPressReleases();
         setIsAddEventModalOpen(false);
         setNewEventTitle("");
         setNewEventDescription("");
@@ -205,14 +230,30 @@ export const EventSchedules: React.FC<EventSchedulesProps> = ({
     }
   };
 
-  const eventTypes = ["All", "पदयात्रा", "प्रेस वार्ता", "धर्म संसद", "कार्यकर्ता सम्मेलन", "सत्याग्रह"];
+  const eventTypes = [
+    { id: "All", label: "सभी (All)" },
+    { id: "Karyakram", label: "🚩 कार्यक्रम (Karyakram)" },
+    { id: "Rally", label: "📣 रैली (Rally)" },
+    { id: "पदयात्रा", label: "🚶‍♂️ पदयात्रा" },
+    { id: "प्रेस वार्ता", label: "🎤 प्रेस वार्ता" },
+    { id: "कार्यकर्ता सम्मेलन", label: "👥 कार्यकर्ता सम्मेलन" }
+  ];
 
-  const filteredEvents = CAMPAIGN_EVENTS.filter((evt) => {
-    const matchesType = selectedType === "All" || evt.type === selectedType;
+  const filteredEvents = eventsList.filter((evt) => {
+    let matchesType = selectedType === "All";
+    if (!matchesType) {
+      const evtType = (evt.type || evt.category || "").toLowerCase();
+      const selType = selectedType.toLowerCase();
+      matchesType = evtType === selType ||
+        (selType === "karyakram" && (evtType.includes("karyakram") || evtType.includes("कार्यक्रम"))) ||
+        (selType === "rally" && (evtType.includes("rally") || evtType.includes("रैली"))) ||
+        (evtType.includes(selType));
+    }
+
     const matchesSearch = 
-      evt.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      evt.locationName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      evt.cityState.toLowerCase().includes(searchQuery.toLowerCase());
+      (evt.title || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (evt.locationName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (evt.cityState || "").toLowerCase().includes(searchQuery.toLowerCase());
     return matchesType && matchesSearch;
   });
 
@@ -252,7 +293,7 @@ export const EventSchedules: React.FC<EventSchedulesProps> = ({
       if (data.success) {
         setIssuedTicket(data.ticket);
       } else {
-        alert("RSVP पंजीकरण में त्रुटि।");
+        alert("RSVP दर्ज करने में त्रुटि।");
       }
     } catch (err) {
       console.error(err);
@@ -284,17 +325,17 @@ export const EventSchedules: React.FC<EventSchedulesProps> = ({
         {/* Filter Controls & Admin Add Event Button */}
         <div className="bg-white border border-orange-200 p-4 sm:p-5 rounded-2xl shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex flex-wrap items-center gap-1.5 w-full md:w-auto">
-            {eventTypes.map((type) => (
+            {eventTypes.map((t) => (
               <button
-                key={type}
-                onClick={() => setSelectedType(type)}
+                key={t.id}
+                onClick={() => setSelectedType(t.id)}
                 className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  selectedType === type
+                  selectedType === t.id
                     ? "bg-orange-500 text-white shadow-md font-black"
                     : "bg-orange-50 text-slate-700 hover:text-orange-900 border border-orange-200"
                 }`}
               >
-                {type}
+                {t.label}
               </button>
             ))}
           </div>
@@ -355,13 +396,15 @@ export const EventSchedules: React.FC<EventSchedulesProps> = ({
                         </span>
                       )}
 
-                      <button
-                        onClick={() => handleDeleteEvent(event.id)}
-                        className="p-1 rounded bg-red-100 hover:bg-red-200 text-red-700 transition-colors cursor-pointer"
-                        title="कार्यक्रम हटाएं (Delete Event - Admin credentials required)"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      {isAdminLoggedIn && (
+                        <button
+                          onClick={() => handleDeleteEvent(event.id)}
+                          className="p-1 rounded bg-red-100 hover:bg-red-200 text-red-700 transition-colors cursor-pointer"
+                          title="कार्यक्रम हटाएं (Delete Event)"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -406,22 +449,6 @@ export const EventSchedules: React.FC<EventSchedulesProps> = ({
                           {spk}
                         </span>
                       ))}
-                    </div>
-                  </div>
-
-                  {/* Capacity Bar */}
-                  <div className="space-y-1 pt-1">
-                    <div className="flex justify-between text-[11px] font-bold text-slate-700">
-                      <span>पंजीकरण संख्या</span>
-                      <span className="font-black text-orange-950">
-                        {event.rsvpCount} / {event.capacity}
-                      </span>
-                    </div>
-                    <div className="w-full h-2.5 bg-orange-100 rounded-full overflow-hidden border border-orange-200">
-                      <div 
-                        className="h-full bg-gradient-to-r from-orange-500 to-amber-500 rounded-full"
-                        style={{ width: `${Math.min(100, (event.rsvpCount / event.capacity) * 100)}%` }}
-                      />
                     </div>
                   </div>
 
@@ -489,8 +516,8 @@ export const EventSchedules: React.FC<EventSchedulesProps> = ({
                         <span className="font-extrabold text-white">{issuedTicket.attendeeName}</span>
                       </div>
                       <div>
-                        <span className="text-orange-100 block text-[10px]">सीट संख्या:</span>
-                        <span className="font-extrabold text-white">{issuedTicket.guestsCount} सीट</span>
+                        <span className="text-orange-100 block text-[10px]">कुल पास / सदस्य:</span>
+                        <span className="font-extrabold text-white">{issuedTicket.guestsCount} सदस्य</span>
                       </div>
                       <div>
                         <span className="text-orange-100 block text-[10px]">पास संख्या:</span>
@@ -515,7 +542,7 @@ export const EventSchedules: React.FC<EventSchedulesProps> = ({
                 <form onSubmit={handleRsvpSubmit} className="space-y-4 text-xs">
                   <div>
                     <span className="text-[10px] font-black uppercase text-orange-700 tracking-wider">
-                      कार्यक्रम सीट बुक करें
+                      कार्यक्रम प्रवेश पास
                     </span>
                     <h3 className="text-lg font-black text-orange-950">{activeRsvpEvent.title}</h3>
                     <p className="text-xs text-slate-700 font-bold mt-1">
@@ -548,15 +575,15 @@ export const EventSchedules: React.FC<EventSchedulesProps> = ({
                   </div>
 
                   <div>
-                    <label className="block font-bold text-slate-800 mb-1">सीटों की संख्या (Guests)</label>
+                    <label className="block font-bold text-slate-800 mb-1">प्रतिभागियों की संख्या (Guests)</label>
                     <select
                       value={guestsCount}
                       onChange={(e) => setGuestsCount(Number(e.target.value))}
                       className="w-full px-3.5 py-2.5 bg-orange-50/50 border border-orange-200 rounded-xl text-slate-900 text-xs focus:outline-none focus:border-orange-500 focus:bg-white"
                     >
-                      <option value={1}>1 सीट (केवल मैं)</option>
-                      <option value={2}>2 सीटें</option>
-                      <option value={3}>3 सीटें</option>
+                      <option value={1}>1 पास (केवल मैं)</option>
+                      <option value={2}>2 पास</option>
+                      <option value={3}>3 पास</option>
                       <option value={5}>5+ पारिवारिक वर्ग</option>
                     </select>
                   </div>
@@ -687,6 +714,21 @@ export const EventSchedules: React.FC<EventSchedulesProps> = ({
                       placeholder="उदा. विशाल पदयात्रा एवं जनसभा"
                       className="w-full px-3.5 py-2.5 bg-orange-50/50 border border-orange-200 rounded-xl text-slate-900 text-xs focus:outline-none focus:border-orange-500 focus:bg-white"
                     />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-800">श्रेणी (Category / Type) *</label>
+                    <select
+                      value={newEventCategory}
+                      onChange={(e) => setNewEventCategory(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-orange-50/50 border border-orange-200 rounded-xl text-slate-900 text-xs focus:outline-none focus:border-orange-500 focus:bg-white"
+                    >
+                      <option value="Karyakram">🚩 कार्यक्रम (Karyakram)</option>
+                      <option value="Rally">📣 रैली (Rally)</option>
+                      <option value="पदयात्रा">🚶‍♂️ पदयात्रा</option>
+                      <option value="प्रेस वार्ता">🎤 प्रेस वार्ता</option>
+                      <option value="कार्यकर्ता सम्मेलन">👥 कार्यकर्ता सम्मेलन</option>
+                    </select>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">

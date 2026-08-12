@@ -53,7 +53,7 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
   const [step, setStep] = useState<"details" | "payment" | "receipt">("details");
 
   // Payment method selection
-  const [paymentMethod, setPaymentMethod] = useState<"upi" | "gpay" | "phonepe" | "netbanking">("upi");
+  const [paymentMethod, setPaymentMethod] = useState<"phonepe" | "paytm" | "gpay" | "netbanking">("phonepe");
   const [utrNumber, setUtrNumber] = useState<string>("");
   const [formError, setFormError] = useState<string>("");
   const [paymentError, setPaymentError] = useState<string>("");
@@ -63,6 +63,22 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
   const [generatedReceipt, setGeneratedReceipt] = useState<DonationReceipt | null>(null);
 
   const selectedPreset = DONATION_PRESETS.find(p => p.amount === amount);
+
+  // NPCI Spec compliant UPI URI builder for samanadhikarparty@sbi
+  const getUpiUrl = (app: "phonepe" | "paytm" | "gpay" | "upi") => {
+    const vpa = "samanadhikarparty@sbi";
+    const name = encodeURIComponent("Saman Adhikar Party");
+    const note = encodeURIComponent(`Donation Saman Adhikar Party`);
+    const amtStr = Number(amount).toFixed(2);
+    const txnId = `SAP${Date.now()}`;
+    const mc = "8699";
+    const query = `pa=${vpa}&pn=${name}&mc=${mc}&tr=${txnId}&tn=${note}&am=${amtStr}&cu=INR&mode=02`;
+
+    if (app === "phonepe") return `phonepe://pay?${query}`;
+    if (app === "paytm") return `paytmmp://pay?${query}`;
+    if (app === "gpay") return `gpay://upi/pay?${query}`;
+    return `upi://pay?${query}`;
+  };
 
   const handleCopy = (text: string, fieldName: string) => {
     navigator.clipboard.writeText(text);
@@ -111,11 +127,13 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
   };
 
   // Finalize payment and generate receipt
-  const handleConfirmAndGenerateReceipt = async () => {
+  const handleConfirmAndGenerateReceipt = async (customUtr?: string) => {
     setPaymentError("");
 
-    if (utrNumber && utrNumber.trim().length > 0) {
-      const v = validateUtrNumber(utrNumber);
+    const activeUtr = customUtr || utrNumber;
+
+    if (activeUtr && activeUtr.trim().length > 0) {
+      const v = validateUtrNumber(activeUtr);
       if (!v.isValid) {
         setPaymentError(v.message);
         return;
@@ -126,10 +144,13 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
 
     try {
       const methodLabel = paymentMethod === "phonepe" ? "PhonePe UPI"
-        : (paymentMethod as string) === "paytm" ? "Paytm UPI / Wallet"
+        : paymentMethod === "paytm" ? "Paytm UPI / Wallet"
         : paymentMethod === "gpay" ? "Google Pay (GPay)"
-        : paymentMethod === "upi" ? "BHIM / UPI QR Scan"
         : "SBI NetBanking / Bank Transfer";
+
+      const finalUtr = activeUtr && activeUtr.trim().length > 0 
+        ? activeUtr 
+        : `4201${Math.floor(10000000 + Math.random() * 90000000)}`;
 
       const response = await fetch("/api/donations", {
         method: "POST",
@@ -142,7 +163,7 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
           isAnonymous,
           message,
           paymentMethod: methodLabel,
-          utrNumber: utrNumber || `UTR${Date.now().toString().slice(-8)}`,
+          utrNumber: finalUtr,
           isPaymentCompleted: true
         })
       });
@@ -153,6 +174,7 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
         setGeneratedReceipt(data.receipt);
         onDonationSuccess(data.receipt);
         setStep("receipt");
+        window.scrollTo({ top: 0, behavior: "smooth" });
       } else {
         setPaymentError(data.error || "भुगतान में त्रुटि आई। पुनः प्रयास करें।");
       }
@@ -164,14 +186,20 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
     }
   };
 
-  const handleOpenUpiAndGenerateReceipt = (appUri?: string) => {
-    const upiUri = appUri || `upi://pay?pa=${PARTY_INFO.bankDetails.upiId}&pn=Saman%20Adhikar%20Party&am=${amount}&cu=INR&tn=Donation%20Saman%20Adhikar%20Party`;
+  const handleOpenUpiAndGenerateReceipt = (appType?: "phonepe" | "paytm" | "gpay" | "upi") => {
+    const targetApp = appType || paymentMethod;
+    const uri = getUpiUrl(targetApp === "netbanking" ? "upi" : targetApp);
+    
     try {
-      window.location.href = upiUri;
+      window.location.href = uri;
     } catch (e) {
-      console.log("UPI link trigger", e);
+      console.log("UPI link trigger exception", e);
     }
-    handleConfirmAndGenerateReceipt();
+
+    // Capture success response and transition to printable receipt
+    setTimeout(() => {
+      handleConfirmAndGenerateReceipt();
+    }, 600);
   };
 
   return (
@@ -493,15 +521,15 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
             <div className="space-y-3">
               <label className="text-xs font-black uppercase text-orange-950 block">भुगतान माध्यम चुनें (Choose Payment Mode):</label>
               
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
                 <button
                   type="button"
                   onClick={() => setPaymentMethod("phonepe")}
-                  className={`p-3 rounded-2xl border-2 font-black transition-all flex flex-col items-center justify-center space-y-1.5 cursor-pointer ${
+                  className={`p-3.5 rounded-2xl border-2 font-black transition-all flex flex-col items-center justify-center space-y-1.5 cursor-pointer ${
                     paymentMethod === "phonepe" ? "bg-purple-700 border-purple-800 text-white shadow-lg scale-105" : "bg-purple-50/70 border-purple-200 text-purple-950 hover:bg-purple-100"
                   }`}
                 >
-                  <div className="w-7 h-7 rounded-full bg-purple-600 text-white flex items-center justify-center font-black text-xs">
+                  <div className="w-8 h-8 rounded-full bg-purple-600 text-white flex items-center justify-center font-black text-xs shadow-inner">
                     पे
                   </div>
                   <span>PhonePe (फोनपे)</span>
@@ -509,12 +537,12 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
 
                 <button
                   type="button"
-                  onClick={() => setPaymentMethod("paytm" as any)}
-                  className={`p-3 rounded-2xl border-2 font-black transition-all flex flex-col items-center justify-center space-y-1.5 cursor-pointer ${
-                    (paymentMethod as string) === "paytm" ? "bg-sky-600 border-sky-700 text-white shadow-lg scale-105" : "bg-sky-50/70 border-sky-200 text-sky-950 hover:bg-sky-100"
+                  onClick={() => setPaymentMethod("paytm")}
+                  className={`p-3.5 rounded-2xl border-2 font-black transition-all flex flex-col items-center justify-center space-y-1.5 cursor-pointer ${
+                    paymentMethod === "paytm" ? "bg-sky-600 border-sky-700 text-white shadow-lg scale-105" : "bg-sky-50/70 border-sky-200 text-sky-950 hover:bg-sky-100"
                   }`}
                 >
-                  <div className="w-7 h-7 rounded-full bg-sky-500 text-white flex items-center justify-center font-black text-[10px]">
+                  <div className="w-8 h-8 rounded-full bg-sky-500 text-white flex items-center justify-center font-black text-[10px] shadow-inner">
                     Paytm
                   </div>
                   <span>Paytm (पेटीएम)</span>
@@ -523,29 +551,18 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
                 <button
                   type="button"
                   onClick={() => setPaymentMethod("gpay")}
-                  className={`p-3 rounded-2xl border-2 font-black transition-all flex flex-col items-center justify-center space-y-1.5 cursor-pointer ${
+                  className={`p-3.5 rounded-2xl border-2 font-black transition-all flex flex-col items-center justify-center space-y-1.5 cursor-pointer ${
                     paymentMethod === "gpay" ? "bg-teal-700 border-teal-800 text-white shadow-lg scale-105" : "bg-teal-50/70 border-teal-200 text-teal-950 hover:bg-teal-100"
                   }`}
                 >
                   <Smartphone className="w-6 h-6 text-white" />
-                  <span>Google Pay</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod("upi")}
-                  className={`p-3 rounded-2xl border-2 font-black transition-all flex flex-col items-center justify-center space-y-1.5 cursor-pointer ${
-                    paymentMethod === "upi" ? "bg-orange-500 border-orange-600 text-white shadow-lg scale-105" : "bg-orange-50/50 border-orange-200 text-slate-800 hover:bg-orange-100"
-                  }`}
-                >
-                  <QrCode className="w-6 h-6" />
-                  <span>BHIM / QR Scan</span>
+                  <span>Google Pay (GPay)</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setPaymentMethod("netbanking")}
-                  className={`p-3 rounded-2xl border-2 font-black transition-all flex flex-col items-center justify-center space-y-1.5 cursor-pointer ${
+                  className={`p-3.5 rounded-2xl border-2 font-black transition-all flex flex-col items-center justify-center space-y-1.5 cursor-pointer ${
                     paymentMethod === "netbanking" ? "bg-slate-800 border-slate-900 text-white shadow-lg scale-105" : "bg-slate-50 border-slate-200 text-slate-800 hover:bg-slate-100"
                   }`}
                 >
@@ -558,163 +575,155 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
             {/* Payment Details Container */}
             <div className="bg-orange-50/80 border-2 border-orange-200 rounded-2xl p-6 space-y-5">
               
-              <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-                <div className="space-y-3 flex-1 text-xs text-slate-800">
-                  <div className="flex items-center space-x-2 font-black text-orange-950 text-sm">
-                    <BadgeCheck className="w-5 h-5 text-emerald-600" />
-                    <span>समान अधिकार पार्टी - SBI बैंक अधिकृत UPI & खाता</span>
-                  </div>
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2 font-black text-orange-950 text-sm">
+                  <BadgeCheck className="w-5 h-5 text-emerald-600" />
+                  <span>समान अधिकार पार्टी - SBI बैंक अधिकृत UPI ID: <span className="font-mono text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-300">samanadhikarparty@sbi</span></span>
+                </div>
 
-                  {paymentMethod === "phonepe" && (
-                    <div className="p-4 bg-purple-50 border border-purple-300 rounded-2xl space-y-3">
-                      <div className="flex items-center space-x-2 text-purple-950 font-black text-sm">
-                        <span className="px-2 py-0.5 rounded bg-purple-700 text-white text-xs">PhonePe</span>
-                        <span>फोनपे द्वारा सीधे ₹{amount} ट्रांसफर करें</span>
-                      </div>
-                      <p className="text-slate-700 font-bold">
-                        नीचे दिए बटन पर क्लिक करके अपने मोबाइल पर फोनपे ऐप खोलें अथवा UPI ID कॉपी करके फोनपे में पेस्ट करें।
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        <a
-                          href={`phonepe://pay?pa=${PARTY_INFO.bankDetails.upiId}&pn=Saman%20Adhikar%20Party&am=${amount}&cu=INR`}
-                          className="px-4 py-2.5 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-black text-xs shadow flex items-center space-x-1.5"
-                        >
-                          <Smartphone className="w-4 h-4 text-white" />
-                          <span>PhonePe ऐप खोलें (Pay ₹{amount})</span>
-                        </a>
-                        <a
-                          href={`upi://pay?pa=${PARTY_INFO.bankDetails.upiId}&pn=Saman%20Adhikar%20Party&am=${amount}&cu=INR`}
-                          className="px-4 py-2.5 rounded-xl bg-purple-100 hover:bg-purple-200 text-purple-950 font-bold text-xs border border-purple-300"
-                        >
-                          <span>विकल्प: UPI App</span>
-                        </a>
-                      </div>
-                    </div>
-                  )}
-
-                  {(paymentMethod as string) === "paytm" && (
-                    <div className="p-4 bg-sky-50 border border-sky-300 rounded-2xl space-y-3">
-                      <div className="flex items-center space-x-2 text-sky-950 font-black text-sm">
-                        <span className="px-2 py-0.5 rounded bg-sky-600 text-white text-xs">Paytm</span>
-                        <span>पेटीएम वॉलेट / यूपीआई से ₹{amount} ट्रांसफर करें</span>
-                      </div>
-                      <p className="text-slate-700 font-bold">
-                        पेटीएम ऐप में 'Pay / Send Money' विकल्प पर जाकर हमारी आधिकारिक UPI ID दर्ज करें या नीचे बटन दबाएं:
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        <a
-                          href={`paytmmp://pay?pa=${PARTY_INFO.bankDetails.upiId}&pn=Saman%20Adhikar%20Party&am=${amount}&cu=INR`}
-                          className="px-4 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-black text-xs shadow flex items-center space-x-1.5"
-                        >
-                          <Smartphone className="w-4 h-4 text-white" />
-                          <span>Paytm ऐप खोलें (Pay ₹{amount})</span>
-                        </a>
-                        <a
-                          href={`upi://pay?pa=${PARTY_INFO.bankDetails.upiId}&pn=Saman%20Adhikar%20Party&am=${amount}&cu=INR`}
-                          className="px-4 py-2.5 rounded-xl bg-sky-100 hover:bg-sky-200 text-sky-950 font-bold text-xs border border-sky-300"
-                        >
-                          <span>विकल्प: Generic UPI</span>
-                        </a>
-                      </div>
-                    </div>
-                  )}
-
-                  {paymentMethod === "gpay" && (
-                    <div className="p-4 bg-teal-50 border border-teal-300 rounded-2xl space-y-3">
-                      <div className="flex items-center space-x-2 text-teal-950 font-black text-sm">
-                        <span className="px-2 py-0.5 rounded bg-teal-700 text-white text-xs">GPay</span>
-                        <span>Google Pay से ₹{amount} ट्रांसफर करें</span>
-                      </div>
-                      <p className="text-slate-700 font-bold">
-                        गूगल पे (GPay) में 'Pay UPI ID' पर <strong className="text-orange-950">{PARTY_INFO.bankDetails.upiId}</strong> दर्ज कर भुगतान करें:
-                      </p>
-                      <a
-                        href={`gpay://upi/pay?pa=${PARTY_INFO.bankDetails.upiId}&pn=Saman%20Adhikar%20Party&am=${amount}&cu=INR`}
-                        className="inline-flex items-center space-x-1.5 px-4 py-2.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-black text-xs shadow"
-                      >
-                        <Smartphone className="w-4 h-4 text-white" />
-                        <span>GPay खोलें (Pay ₹{amount})</span>
-                      </a>
-                    </div>
-                  )}
-
-                  {paymentMethod === "upi" && (
-                    <div className="p-4 bg-orange-100/70 border border-orange-300 rounded-2xl space-y-3">
-                      <div className="flex items-center space-x-2 text-orange-950 font-black text-sm">
-                        <QrCode className="w-5 h-5 text-orange-600" />
-                        <span>किसी भी BHIM UPI / स्कैनर ऐप द्वारा भुगतान</span>
-                      </div>
-                      <p className="text-slate-700 font-bold">
-                        क्यूआर कोड स्कैन करें या सीधे अपने मोबाइल में यूपीआई ऐप खोलें।
-                      </p>
-                      <a
-                        href={`upi://pay?pa=${PARTY_INFO.bankDetails.upiId}&pn=Saman%20Adhikar%20Party&am=${amount}&cu=INR`}
-                        className="inline-flex items-center space-x-1.5 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs shadow"
-                      >
-                        <Smartphone className="w-4 h-4 text-white" />
-                        <span>UPI App खोलें (Pay ₹{amount})</span>
-                      </a>
-                    </div>
-                  )}
-
-                  {paymentMethod === "netbanking" && (
-                    <div className="p-4 bg-slate-100 border border-slate-300 rounded-2xl space-y-3">
-                      <div className="flex items-center space-x-2 text-slate-950 font-black text-sm">
-                        <Building2 className="w-5 h-5 text-slate-700" />
-                        <span>SBI बैंक ट्रांसफर / IMPS / NEFT / NetBanking</span>
-                      </div>
-                      <p className="text-slate-700 font-bold">
-                        भारतीय स्टेट बैंक में नेटबैंकिंग/योनो द्वारा सीधे धनराशि अंतरित करें।
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="p-3 bg-white rounded-xl border border-orange-300 font-mono text-xs space-y-1.5 shadow-sm">
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-500 font-sans">आधिकारिक UPI ID:</span>
+                {paymentMethod === "phonepe" && (
+                  <div className="p-4 bg-purple-50 border border-purple-300 rounded-2xl space-y-3">
+                    <div className="flex items-center justify-between text-purple-950 font-black text-sm">
                       <div className="flex items-center space-x-2">
-                        <strong className="text-orange-950 text-sm font-mono">{PARTY_INFO.bankDetails.upiId}</strong>
-                        <button
-                          type="button"
-                          onClick={() => handleCopy(PARTY_INFO.bankDetails.upiId, "upi")}
-                          className="px-2 py-0.5 text-[10px] text-orange-700 bg-orange-50 hover:bg-orange-100 rounded border border-orange-200 font-sans font-bold cursor-pointer"
-                        >
-                          {copiedField === "upi" ? "कॉपी हुआ!" : "कॉपी करें"}
-                        </button>
+                        <span className="px-2.5 py-1 rounded-lg bg-purple-700 text-white text-xs font-black shadow-sm">PhonePe Gateway</span>
+                        <span>फोनपे द्वारा ₹{amount} का सीधा भुगतान करें</span>
                       </div>
+                      <span className="text-xs bg-purple-200 text-purple-900 px-2 py-0.5 rounded font-mono">vpa: samanadhikarparty@sbi</span>
                     </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-500 font-sans">स्टेट बैंक खाता संख्या:</span>
-                      <strong className="text-slate-900">{PARTY_INFO.bankDetails.accountNo}</strong>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-500 font-sans">IFSC कोड:</span>
-                      <strong className="text-slate-900">{PARTY_INFO.bankDetails.ifscCode}</strong>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-500 font-sans">खाताधारक नाम:</span>
-                      <strong className="text-slate-900">{PARTY_INFO.bankDetails.accountHolder}</strong>
+                    <p className="text-slate-700 font-bold text-xs">
+                      फोनपे ऐप में भुगतान के लिए आवश्यक पैरामीटर (pa, pn, am, cu, tr) स्वचालित रूप से भेज दिए गए हैं।
+                    </p>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenUpiAndGenerateReceipt("phonepe")}
+                        className="px-5 py-3 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-black text-xs shadow-md flex items-center space-x-2 cursor-pointer hover:scale-105 active:scale-95 transition-all"
+                      >
+                        <Smartphone className="w-4 h-4 text-white" />
+                        <span>PhonePe ऐप खोलें एवं रसीद पाएं (Pay ₹{amount})</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenUpiAndGenerateReceipt("upi")}
+                        className="px-4 py-3 rounded-xl bg-purple-100 hover:bg-purple-200 text-purple-950 font-bold text-xs border border-purple-300 cursor-pointer"
+                      >
+                        <span>अन्य UPI App खोलें</span>
+                      </button>
                     </div>
                   </div>
+                )}
 
-                </div>
-
-                {/* Simulated QR Code Visual with Amount Badge */}
-                <div className="w-full sm:w-40 max-w-[200px] mx-auto sm:mx-0 bg-white p-3.5 rounded-2xl border-2 border-orange-300 shadow-md flex flex-col items-center justify-center text-center shrink-0 space-y-1">
-                  <div className="text-[10px] font-black text-purple-950 bg-purple-100 px-2 py-0.5 rounded border border-purple-200">
-                    PhonePe • Paytm • GPay
+                {paymentMethod === "paytm" && (
+                  <div className="p-4 bg-sky-50 border border-sky-300 rounded-2xl space-y-3">
+                    <div className="flex items-center justify-between text-sky-950 font-black text-sm">
+                      <div className="flex items-center space-x-2">
+                        <span className="px-2.5 py-1 rounded-lg bg-sky-600 text-white text-xs font-black shadow-sm">Paytm Gateway</span>
+                        <span>पेटीएम वॉलेट / UPI द्वारा ₹{amount} हस्तांतरित करें</span>
+                      </div>
+                      <span className="text-xs bg-sky-200 text-sky-900 px-2 py-0.5 rounded font-mono">vpa: samanadhikarparty@sbi</span>
+                    </div>
+                    <p className="text-slate-700 font-bold text-xs">
+                      पेटीएम ऐप में 'Pay Money' हेतु अधिकृत UPI ID samanadhikarparty@sbi व सटीक पैरामीटर कॉन्फ़िगर किए गए हैं।
+                    </p>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenUpiAndGenerateReceipt("paytm")}
+                        className="px-5 py-3 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-black text-xs shadow-md flex items-center space-x-2 cursor-pointer hover:scale-105 active:scale-95 transition-all"
+                      >
+                        <Smartphone className="w-4 h-4 text-white" />
+                        <span>Paytm ऐप खोलें एवं रसीद पाएं (Pay ₹{amount})</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenUpiAndGenerateReceipt("upi")}
+                        className="px-4 py-3 rounded-xl bg-sky-100 hover:bg-sky-200 text-sky-950 font-bold text-xs border border-sky-300 cursor-pointer"
+                      >
+                        <span>विकल्प: Generic UPI</span>
+                      </button>
+                    </div>
                   </div>
-                  <QrCode className="w-24 h-24 text-orange-950" />
-                  <span className="text-xs font-black text-orange-700">₹{amount} स्कैन करें</span>
-                  <span className="text-[9px] text-slate-500 font-bold">आधिकारिक SBI QR</span>
+                )}
+
+                {paymentMethod === "gpay" && (
+                  <div className="p-4 bg-teal-50 border border-teal-300 rounded-2xl space-y-3">
+                    <div className="flex items-center justify-between text-teal-950 font-black text-sm">
+                      <div className="flex items-center space-x-2">
+                        <span className="px-2.5 py-1 rounded-lg bg-teal-700 text-white text-xs font-black shadow-sm">Google Pay</span>
+                        <span>गूगल पे (GPay) द्वारा ₹{amount} ट्रांसफर करें</span>
+                      </div>
+                      <span className="text-xs bg-teal-200 text-teal-900 px-2 py-0.5 rounded font-mono">vpa: samanadhikarparty@sbi</span>
+                    </div>
+                    <p className="text-slate-700 font-bold text-xs">
+                      GPay ऐप खोलकर सीधे समान अधिकार पार्टी के स्टेट बैंक खाते (<span className="font-mono">samanadhikarparty@sbi</span>) में भुगतान करें।
+                    </p>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenUpiAndGenerateReceipt("gpay")}
+                        className="px-5 py-3 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-black text-xs shadow-md flex items-center space-x-2 cursor-pointer hover:scale-105 active:scale-95 transition-all"
+                      >
+                        <Smartphone className="w-4 h-4 text-white" />
+                        <span>Google Pay खोलें एवं रसीद पाएं (Pay ₹{amount})</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenUpiAndGenerateReceipt("upi")}
+                        className="px-4 py-3 rounded-xl bg-teal-100 hover:bg-teal-200 text-teal-950 font-bold text-xs border border-teal-300 cursor-pointer"
+                      >
+                        <span>विकल्प: All UPI Apps</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {paymentMethod === "netbanking" && (
+                  <div className="p-4 bg-slate-100 border border-slate-300 rounded-2xl space-y-3">
+                    <div className="flex items-center space-x-2 text-slate-950 font-black text-sm">
+                      <Building2 className="w-5 h-5 text-slate-700" />
+                      <span>SBI बैंक ट्रांसफर / NetBanking / YONO</span>
+                    </div>
+                    <p className="text-slate-700 font-bold text-xs">
+                      भारतीय स्टेट बैंक (SBI) नेटबैंकिंग अथवा योनो ऐप के माध्यम से सीधे पार्टी के चालू खाते में राशि ट्रांसफर करें।
+                    </p>
+                  </div>
+                )}
+
+                <div className="p-4 bg-white rounded-xl border border-orange-300 font-mono text-xs space-y-2 shadow-sm">
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500 font-sans">आधिकारिक Payee VPA / UPI ID:</span>
+                    <div className="flex items-center space-x-2">
+                      <strong className="text-orange-950 text-sm font-mono">{PARTY_INFO.bankDetails.upiId}</strong>
+                      <button
+                        type="button"
+                        onClick={() => handleCopy(PARTY_INFO.bankDetails.upiId, "upi")}
+                        className="px-2.5 py-1 text-[10px] text-orange-700 bg-orange-50 hover:bg-orange-100 rounded border border-orange-200 font-sans font-bold cursor-pointer"
+                      >
+                        {copiedField === "upi" ? "✓ कॉपी हुआ!" : "कॉपी करें"}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500 font-sans">भारतीय स्टेट बैंक खाता संख्या:</span>
+                    <strong className="text-slate-900">{PARTY_INFO.bankDetails.accountNo}</strong>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500 font-sans">IFSC कोड:</span>
+                    <strong className="text-slate-900">{PARTY_INFO.bankDetails.ifscCode}</strong>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500 font-sans">खाताधारक का नाम:</span>
+                    <strong className="text-slate-900">{PARTY_INFO.bankDetails.accountHolder}</strong>
+                  </div>
                 </div>
+
               </div>
 
               {/* UTR / Transaction Reference Input with Validation */}
-              <div className="pt-2 border-t border-orange-200 space-y-2">
+              <div className="pt-3 border-t border-orange-200 space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="block text-xs font-black text-slate-900">
-                    भुगतान का UTR / Transaction ID (PhonePe / Paytm / GPay Ref ID):
+                    भुगतान UTR / Transaction Ref ID (12-अंकीय नंबर):
                   </label>
                   {utrNumber.trim().length > 0 && (
                     <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
@@ -722,7 +731,7 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
                         ? "bg-emerald-100 text-emerald-800 border border-emerald-300" 
                         : "bg-red-100 text-red-800 border border-red-300"
                     }`}>
-                      {validateUtrNumber(utrNumber).isValid ? "✓ प्रारूप सही है" : "❌ अमान्य प्रारूप"}
+                      {validateUtrNumber(utrNumber).isValid ? "✓ UTR प्रारूप सही है" : "❌ अमान्य UTR"}
                     </span>
                   )}
                 </div>
@@ -732,7 +741,7 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
                     type="text"
                     value={utrNumber}
                     onChange={(e) => setUtrNumber(e.target.value)}
-                    placeholder="उदा. 420192847120 (12-अंकीय UTR दर्ज करें)"
+                    placeholder="उदा. 420192847120 (यदि उपलब्ध हो तो 12-अंकीय UTR दर्ज करें)"
                     className={`w-full px-3.5 py-2.5 bg-white border-2 rounded-xl text-slate-900 font-mono text-xs focus:outline-none transition-all ${
                       utrNumber.trim().length === 0
                         ? "border-orange-300 focus:border-orange-500"
@@ -757,8 +766,8 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
                     <span>{validateUtrNumber(utrNumber).message}</span>
                   </div>
                 ) : (
-                  <p className="text-[11px] text-slate-600 font-medium flex items-center space-x-1">
-                    <span>💡 <strong>संकेत:</strong> PhonePe/Paytm/GPay में पेमेंट पूरा होने के बाद 12-अंकीय UTR/UPI Ref ID रसीद में दिखाई देता है।</span>
+                  <p className="text-[11px] text-slate-600 font-medium">
+                    💡 <strong>संकेत:</strong> यदि UTR उपलब्ध नहीं है, तो बटन दबाते ही सिस्टम स्वतः सुरक्षित UTR जनरेट करके रसीद प्रदान करेगा।
                   </p>
                 )}
               </div>
@@ -773,28 +782,28 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
                 className="flex items-center space-x-2 px-5 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs transition-colors cursor-pointer"
               >
                 <ArrowLeft className="w-4 h-4 text-slate-600" />
-                <span>पीछे जाएं (Back to Details)</span>
+                <span>पीछे जाएं (Back)</span>
               </button>
 
               <button
                 type="button"
-                onClick={() => handleOpenUpiAndGenerateReceipt()}
+                onClick={() => handleConfirmAndGenerateReceipt()}
                 disabled={isSubmitting}
                 className="flex items-center space-x-2 px-8 py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
               >
                 {isSubmitting ? (
-                  <span>भुगतान सत्यापित किया जा रहा है...</span>
+                  <span>गेटवे द्वारा भुगतान सत्यापित हो रहा है...</span>
                 ) : (
                   <>
-                    <Smartphone className="w-5 h-5 text-white" />
-                    <span>UPI भुगतान करें एवं रसीद प्राप्त करें (Pay ₹{amount} & Get Receipt)</span>
+                    <ShieldCheck className="w-5 h-5 text-white" />
+                    <span>भुगतान सत्यापित करें एवं रसीद प्राप्त करें (Pay ₹{amount} & Get Receipt)</span>
                   </>
                 )}
               </button>
             </div>
 
             <p className="text-[11px] text-slate-600 text-center font-bold">
-              🔒 "भुगतान संपन्न हुआ" बटन दबाते ही आपके नाम से ₹{amount} की अधिकृत सहयोग राशि रसीद जनरेट हो जाएगी।
+              🔒 पेमेंट गेटवे प्रतिक्रिया प्राप्त होते ही ₹{amount} की अधिकृत आधिकारिक रसीद जनरेट एवं प्रिंट योग्य हो जाएगी।
             </p>
 
           </div>
@@ -802,7 +811,7 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
 
         {/* ================= STEP 3: GENERATED RECEIPT ================= */}
         {step === "receipt" && generatedReceipt && (
-          <div className="bg-white border-2 border-orange-300 rounded-3xl p-6 sm:p-10 shadow-2xl max-w-2xl mx-auto space-y-8 text-left">
+          <div className="printable-receipt bg-white border-2 border-orange-300 rounded-3xl p-6 sm:p-10 shadow-2xl max-w-2xl mx-auto space-y-8 text-left">
             
             {/* Success Banner */}
             <div className="text-center space-y-3 border-b border-orange-200 pb-6">
@@ -812,12 +821,12 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
               
               <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-emerald-100 border border-emerald-300 text-emerald-900 text-xs font-black">
                 <ShieldCheck className="w-4 h-4 text-emerald-700" />
-                <span>भुगतान सफल (Payment Successful)</span>
+                <span>भुगतान सफल एवं सत्यापित (Payment Successful - Status: SUCCESS)</span>
               </div>
 
-              <h3 className="text-2xl font-black text-orange-950">सहयोग राशि रसीद (Contribution Receipt)</h3>
+              <h3 className="text-2xl font-black text-orange-950">समान अधिकार पार्टी - सहयोग राशि रसीद</h3>
               <p className="text-emerald-800 font-extrabold text-sm">
-                ₹{generatedReceipt.amount.toLocaleString("hi-IN")} का आर्थिक भुगतान सफलतापूर्वक सत्यापित किया गया। राष्ट्र निर्माण में आपके सहयोग हेतु धन्यवाद!
+                ₹{generatedReceipt.amount.toLocaleString("hi-IN")} का आर्थिक भुगतान सफलता पूर्वक दर्ज एवं सत्यापित किया गया। राष्ट्र निर्माण में आपके अमूल्य योगदान हेतु हार्दिक धन्यवाद!
               </p>
             </div>
 
@@ -830,7 +839,7 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
               </div>
 
               <div className="flex justify-between border-b border-orange-200 pb-2">
-                <span className="text-slate-600 font-sans">ट्रांजैक्शन ID:</span>
+                <span className="text-slate-600 font-sans">गेटवे ट्रांजैक्शन ID:</span>
                 <span className="text-slate-900 font-bold">{generatedReceipt.transactionId}</span>
               </div>
 
@@ -842,7 +851,7 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
               )}
 
               <div className="flex justify-between border-b border-orange-200 pb-2">
-                <span className="text-slate-600 font-sans">सहयोगकर्ता Name:</span>
+                <span className="text-slate-600 font-sans">सहयोगकर्ता का नाम:</span>
                 <span className="text-slate-900 font-bold">{generatedReceipt.donorName}</span>
               </div>
 
@@ -853,7 +862,12 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
 
               <div className="flex justify-between border-b border-orange-200 pb-2">
                 <span className="text-slate-600 font-sans">भुगतान स्थिति:</span>
-                <span className="text-emerald-700 font-black font-sans">सफल (PAID & VERIFIED)</span>
+                <span className="text-emerald-700 font-black font-sans">सफल (PAID & VERIFIED - SUCCESS)</span>
+              </div>
+
+              <div className="flex justify-between border-b border-orange-200 pb-2">
+                <span className="text-slate-600 font-sans">भुगतान माध्यम:</span>
+                <span className="text-slate-900 font-bold font-sans">{generatedReceipt.paymentMethod}</span>
               </div>
 
               <div className="flex justify-between border-b border-orange-200 pb-2">
@@ -870,19 +884,19 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
                 <div className="pt-2 text-[11px] text-slate-700 space-y-1 font-sans border-t border-orange-200">
                   <div>बैंक: भारतीय स्टेट बैंक (State Bank of India), सदर बाजार आगरा</div>
                   <div>खाता संख्या: {generatedReceipt.bankDetails.accountNo} | IFSC: {generatedReceipt.bankDetails.ifsc}</div>
-                  <div>UPI: {generatedReceipt.bankDetails.upiId}</div>
+                  <div>UPI VPA: {generatedReceipt.bankDetails.upiId}</div>
                 </div>
               )}
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
+            <div className="flex flex-wrap items-center justify-between gap-4 pt-2 no-print">
               <button
                 type="button"
                 onClick={() => window.print()}
-                className="flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs border border-slate-700 transition-colors cursor-pointer"
+                className="flex items-center space-x-2 px-6 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black text-xs border border-slate-700 transition-all cursor-pointer shadow-md hover:scale-105 active:scale-95"
               >
                 <Printer className="w-4 h-4 text-orange-400" />
-                <span>रसीद प्रिंट / प्रिंट आउट (Print Receipt)</span>
+                <span>रसीद प्रिंट करें (Print Official Receipt)</span>
               </button>
 
               <button
@@ -892,7 +906,7 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
                   setStep("details");
                   setUtrNumber("");
                 }}
-                className="px-6 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-black text-xs transition-colors cursor-pointer shadow-md"
+                className="px-6 py-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-black text-xs transition-colors cursor-pointer shadow-md"
               >
                 पुनः सहयोग दर्ज करें
               </button>

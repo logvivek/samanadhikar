@@ -163,14 +163,23 @@ export const PressReleases: React.FC<PressReleasesProps> = ({
   const filteredPressReleases = pressReleases.filter((pr) => {
     if (selectedCategory === "Shorts") {
       if (!pr.hasVideo && !pr.videoUrl) return false;
-    } else if (selectedCategory !== "All" && pr.category !== selectedCategory) {
-      return false;
+    } else if (selectedCategory !== "All") {
+      const prCat = (pr.category || "").toLowerCase();
+      const selCat = selectedCategory.toLowerCase();
+      const isMatch = prCat === selCat ||
+        (selCat === "karyakram" && (prCat.includes("karyakram") || prCat.includes("कार्यक्रम"))) ||
+        (selCat === "rally" && (prCat.includes("rally") || prCat.includes("रैली"))) ||
+        (selCat === "demonstration" && (prCat.includes("demonstration") || prCat.includes("प्रदर्शन") || prCat.includes("पदयात्रा"))) ||
+        (selCat === "press briefing" && (prCat.includes("press") || prCat.includes("वार्ता") || prCat.includes("ब्रीफिंग"))) ||
+        (selCat === "national agenda" && (prCat.includes("national") || prCat.includes("एजेंडा") || prCat.includes("संकल्प"))) ||
+        (selCat === "public announcement" && (prCat.includes("public") || prCat.includes("घोषणा")));
+      if (!isMatch) return false;
     }
 
     const matchesSearch =
-      pr.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      pr.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      pr.location.toLowerCase().includes(searchQuery.toLowerCase());
+      (pr.title || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (pr.content || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (pr.location || "").toLowerCase().includes(searchQuery.toLowerCase());
     return matchesSearch;
   });
 

@@ -179,29 +179,56 @@ async function startServer() {
 
   app.post("/api/events", verifyAdmin, async (req, res) => {
     try {
-      const { title, titleHi, date, displayDate, time, locationName, address, description, featuredSpeakers } = req.body;
+      const { title, titleHi, type, category, date, displayDate, time, locationName, address, description, featuredSpeakers, isVirtual, capacity, precinctDistrict } = req.body;
+      
+      const eventType = type || category || "Rally";
+      const formattedDate = date || new Date().toISOString().split("T")[0];
+      
+      let formattedDisplayDate = displayDate;
+      if (!formattedDisplayDate && formattedDate) {
+        try {
+          formattedDisplayDate = new Date(formattedDate).toLocaleDateString("hi-IN", {
+            weekday: "long",
+            year: "numeric",
+            month: "long",
+            day: "numeric"
+          });
+        } catch {
+          formattedDisplayDate = formattedDate;
+        }
+      }
+
+      let parsedSpeakers: string[] = ["कुलदीप शर्मा (राष्ट्रीय अध्यक्ष)"];
+      if (Array.isArray(featuredSpeakers) && featuredSpeakers.length > 0) {
+        parsedSpeakers = featuredSpeakers;
+      } else if (typeof featuredSpeakers === "string" && featuredSpeakers.trim()) {
+        parsedSpeakers = featuredSpeakers.split(",").map(s => s.trim()).filter(Boolean);
+      }
+
       const newEvt = {
         id: `evt-${Date.now()}`,
         title: title || titleHi || "समान अधिकार पार्टी सभा",
         titleHi: titleHi || title || "समान अधिकार पार्टी सभा",
-        type: "Rally" as const,
-        date: date || new Date().toISOString().split("T")[0],
-        displayDate: displayDate || date,
+        type: eventType,
+        category: eventType,
+        date: formattedDate,
+        displayDate: formattedDisplayDate || formattedDate,
         time: time || "सायं 4:00 बजे से",
         locationName: locationName || "आगरा HQ",
         address: address || locationName || "आगरा",
         cityState: "उत्तर प्रदेश",
-        precinctDistrict: "आगरा-मथुरा मण्डल",
+        precinctDistrict: precinctDistrict || "आगरा-मथुरा मण्डल",
         description: description || "समान अधिकार पार्टी का विशाल जन-समारोह।",
-        isVirtual: false,
-        capacity: 10000,
+        isVirtual: Boolean(isVirtual),
+        capacity: capacity || 10000,
         rsvpCount: 0,
-        featuredSpeakers: Array.isArray(featuredSpeakers) ? featuredSpeakers : ["कुलदीप शर्मा (राष्ट्रीय अध्यक्ष)"]
+        featuredSpeakers: parsedSpeakers
       };
 
       await addEventDb(newEvt);
       return res.json({ success: true, message: "कार्यक्रम डेटाबेस में सफलतापूर्वक प्रकाशित!", event: newEvt });
     } catch (err) {
+      console.error("Add event error:", err);
       return res.status(500).json({ error: "कार्यक्रम जोड़ने में विफल।" });
     }
   });
@@ -218,12 +245,12 @@ async function startServer() {
     return res.json({ success: true, message: "समस्त डेटाबेस (Lite DB) मूल डिफ़ॉल्ट स्थिति में रीसेट हो गया है।" });
   });
 
-  // Helper function to prune YouTube Shorts to keep strictly the latest 7
+  // Helper function to prune seed YouTube Shorts to keep strictly the latest 7
   async function pruneYouTubeShortsToLatest7() {
     const allPRs = await getPressReleasesDb();
+    // Only prune seed / auto-synced YouTube shorts (id starting with pr-yt- or seed-yt-), NEVER delete user-created PRs (PR-...)
     const ytShorts = allPRs.filter((pr) => 
-      pr.id.startsWith("pr-yt-") || 
-      (pr.videoUrl && (pr.videoUrl.includes("youtube.com") || pr.videoUrl.includes("youtu.be")))
+      pr.id.startsWith("pr-yt-") || pr.id.startsWith("seed-yt-")
     );
 
     ytShorts.sort((a, b) => {
@@ -329,17 +356,18 @@ async function startServer() {
     try {
       const { title, titleEn, content, contentEn, category, date, location, spokesperson, imageUrl, videoUrl, videoCaption, isUrgent } = req.body;
 
-      if (!title || !content) {
-        return res.status(400).json({ error: "शीर्षक (Title) और विवरण (Content) आवश्यक हैं।" });
+      if (!title || !title.trim()) {
+        return res.status(400).json({ error: "शीर्षक (Title) आवश्यक है।" });
       }
 
+      const finalContent = (content && content.trim().length > 0) ? content.trim() : title.trim();
       const hasVideo = Boolean(videoUrl && videoUrl.trim().length > 0);
 
       const newPR: PressReleaseRecord = {
         id: `PR-${Date.now().toString().slice(-6)}`,
         title: title.trim(),
         titleEn: titleEn ? titleEn.trim() : "",
-        content: content.trim(),
+        content: finalContent,
         contentEn: contentEn ? contentEn.trim() : "",
         category: category || "Public Announcement",
         date: date || new Date().toISOString().split("T")[0],

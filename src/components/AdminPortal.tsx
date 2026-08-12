@@ -457,7 +457,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         body: JSON.stringify({
           title: newEventTitle,
           titleHi: newEventTitle,
-          type: newEventCategory === "Rally" ? "Rally" : "Town Hall",
+          type: newEventCategory,
+          category: newEventCategory,
           date: newEventDate,
           displayDate: new Date(newEventDate).toLocaleDateString("hi-IN", {
             weekday: "long",
@@ -470,7 +471,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           address: newEventLocation,
           cityState: "उत्तर प्रदेश",
           description: newEventDescription || "समान अधिकार पार्टी का विशाल जन-समारोह।",
-          featuredSpeakers: newEventSpeakers.split(",").map(s => s.trim())
+          featuredSpeakers: newEventSpeakers.split(",").map(s => s.trim()).filter(Boolean)
         })
       });
 
@@ -588,6 +589,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             </div>
             <div className="inline-block px-3 py-1 rounded-full bg-orange-100 text-orange-800 text-[10px] font-black uppercase tracking-wider mb-2">
               प्रशासन प्रवेश द्वार (Admin Access Portal)
+            </div>
+            <div className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-orange-50 border border-orange-300 text-orange-950 text-xs font-black mb-3 shadow-xs">
+              <ShieldCheck className="w-3.5 h-3.5 text-orange-600 shrink-0" />
+              <span>पंजीकरण संख्या: 56/158/2024-ECI</span>
             </div>
             <h2 className="text-2xl font-black text-slate-900 tracking-tight">
               समान अधिकार पार्टी - एडमिन लॉगिन

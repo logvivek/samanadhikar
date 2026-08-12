@@ -161,6 +161,7 @@ export default function App() {
         {activeTab === "events" && (
           <EventSchedules
             onAskAiEvent={handleOpenAiWithQuery}
+            onRefreshEventsAndPressReleases={fetchPressReleasesData}
           />
         )}
 

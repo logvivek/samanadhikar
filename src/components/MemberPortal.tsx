@@ -367,13 +367,14 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
                   </div>
 
                   {/* Payment App Chooser */}
+                  {/* Payment App Selector */}
                   <div className="space-y-2">
-                    <label className="font-bold text-slate-800 block">भुगतान माध्यम चुनें (Select Payment App):</label>
-                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                    <label className="font-bold text-slate-800 block">भुगतान माध्यम चुनें (Select Payment Mode):</label>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                       <button
                         type="button"
                         onClick={() => setPaymentApp("phonepe")}
-                        className={`p-2.5 rounded-xl border-2 font-black flex flex-col items-center justify-center space-y-1 cursor-pointer transition-all ${
+                        className={`p-3 rounded-xl border-2 font-black flex flex-col items-center justify-center space-y-1 cursor-pointer transition-all ${
                           paymentApp === "phonepe" ? "bg-purple-700 border-purple-800 text-white shadow-md" : "bg-purple-50 border-purple-200 text-purple-950"
                         }`}
                       >
@@ -384,7 +385,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
                       <button
                         type="button"
                         onClick={() => setPaymentApp("paytm")}
-                        className={`p-2.5 rounded-xl border-2 font-black flex flex-col items-center justify-center space-y-1 cursor-pointer transition-all ${
+                        className={`p-3 rounded-xl border-2 font-black flex flex-col items-center justify-center space-y-1 cursor-pointer transition-all ${
                           paymentApp === "paytm" ? "bg-sky-600 border-sky-700 text-white shadow-md" : "bg-sky-50 border-sky-200 text-sky-950"
                         }`}
                       >
@@ -395,7 +396,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
                       <button
                         type="button"
                         onClick={() => setPaymentApp("gpay")}
-                        className={`p-2.5 rounded-xl border-2 font-black flex flex-col items-center justify-center space-y-1 cursor-pointer transition-all ${
+                        className={`p-3 rounded-xl border-2 font-black flex flex-col items-center justify-center space-y-1 cursor-pointer transition-all ${
                           paymentApp === "gpay" ? "bg-teal-700 border-teal-800 text-white shadow-md" : "bg-teal-50 border-teal-200 text-teal-950"
                         }`}
                       >
@@ -405,19 +406,8 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
 
                       <button
                         type="button"
-                        onClick={() => setPaymentApp("upi")}
-                        className={`p-2.5 rounded-xl border-2 font-black flex flex-col items-center justify-center space-y-1 cursor-pointer transition-all ${
-                          paymentApp === "upi" ? "bg-orange-500 border-orange-600 text-white shadow-md" : "bg-orange-50 border-orange-200 text-slate-800"
-                        }`}
-                      >
-                        <QrCode className="w-4 h-4" />
-                        <span>BHIM / QR</span>
-                      </button>
-
-                      <button
-                        type="button"
                         onClick={() => setPaymentApp("netbanking")}
-                        className={`p-2.5 rounded-xl border-2 font-black flex flex-col items-center justify-center space-y-1 cursor-pointer transition-all ${
+                        className={`p-3 rounded-xl border-2 font-black flex flex-col items-center justify-center space-y-1 cursor-pointer transition-all ${
                           paymentApp === "netbanking" ? "bg-slate-800 border-slate-900 text-white shadow-md" : "bg-slate-50 border-slate-200 text-slate-800"
                         }`}
                       >
@@ -432,66 +422,81 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
                     
                     {paymentApp === "phonepe" && (
                       <div className="p-3 bg-purple-50 border border-purple-200 rounded-xl space-y-2">
-                        <div className="font-black text-purple-950">PhonePe App direct link:</div>
-                        <a
-                          href={`phonepe://pay?pa=${PARTY_INFO.bankDetails.upiId}&pn=Saman%20Adhikar%20Party&am=${membershipFee}&cu=INR`}
-                          className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-black text-xs shadow"
+                        <div className="font-black text-purple-950 text-xs">PhonePe App direct gateway:</div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const txnId = `SAPMEMBER${Date.now()}`;
+                            const upiUrl = `phonepe://pay?pa=samanadhikarparty@sbi&pn=Saman%20Adhikar%20Party&mc=8699&tr=${txnId}&tn=MemberRegistration&am=${membershipFee}&cu=INR&mode=02`;
+                            window.location.href = upiUrl;
+                          }}
+                          className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-black text-xs shadow cursor-pointer hover:scale-105 transition-all"
                         >
                           <Smartphone className="w-4 h-4 text-white" />
                           <span>PhonePe ऐप खोलें (Pay ₹{membershipFee})</span>
-                        </a>
+                        </button>
                       </div>
                     )}
 
                     {paymentApp === "paytm" && (
                       <div className="p-3 bg-sky-50 border border-sky-200 rounded-xl space-y-2">
-                        <div className="font-black text-sky-950">Paytm Wallet & UPI direct link:</div>
-                        <a
-                          href={`paytmmp://pay?pa=${PARTY_INFO.bankDetails.upiId}&pn=Saman%20Adhikar%20Party&am=${membershipFee}&cu=INR`}
-                          className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-black text-xs shadow"
+                        <div className="font-black text-sky-950 text-xs">Paytm Wallet & UPI direct gateway:</div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const txnId = `SAPMEMBER${Date.now()}`;
+                            const upiUrl = `paytmmp://pay?pa=samanadhikarparty@sbi&pn=Saman%20Adhikar%20Party&mc=8699&tr=${txnId}&tn=MemberRegistration&am=${membershipFee}&cu=INR&mode=02`;
+                            window.location.href = upiUrl;
+                          }}
+                          className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-black text-xs shadow cursor-pointer hover:scale-105 transition-all"
                         >
                           <Smartphone className="w-4 h-4 text-white" />
                           <span>Paytm ऐप खोलें (Pay ₹{membershipFee})</span>
-                        </a>
+                        </button>
                       </div>
                     )}
 
                     {paymentApp === "gpay" && (
                       <div className="p-3 bg-teal-50 border border-teal-200 rounded-xl space-y-2">
-                        <div className="font-black text-teal-950">Google Pay link:</div>
-                        <a
-                          href={`gpay://upi/pay?pa=${PARTY_INFO.bankDetails.upiId}&pn=Saman%20Adhikar%20Party&am=${membershipFee}&cu=INR`}
-                          className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-black text-xs shadow"
+                        <div className="font-black text-teal-950 text-xs">Google Pay gateway:</div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const txnId = `SAPMEMBER${Date.now()}`;
+                            const upiUrl = `gpay://upi/pay?pa=samanadhikarparty@sbi&pn=Saman%20Adhikar%20Party&mc=8699&tr=${txnId}&tn=MemberRegistration&am=${membershipFee}&cu=INR&mode=02`;
+                            window.location.href = upiUrl;
+                          }}
+                          className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-black text-xs shadow cursor-pointer hover:scale-105 transition-all"
                         >
                           <Smartphone className="w-4 h-4 text-white" />
                           <span>Google Pay खोलें (Pay ₹{membershipFee})</span>
-                        </a>
+                        </button>
                       </div>
                     )}
 
                     <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-3.5 rounded-xl border border-orange-300">
                       <div className="space-y-1 text-xs">
-                        <div className="font-bold text-slate-500">स्टेट बैंक UPI ID:</div>
-                        <div className="text-sm font-black text-orange-950 font-mono">{PARTY_INFO.bankDetails.upiId}</div>
+                        <div className="font-bold text-slate-500">स्टेट बैंक अधिकृत UPI ID:</div>
+                        <div className="text-sm font-black text-orange-950 font-mono">samanadhikarparty@sbi</div>
                         <button
                           type="button"
                           onClick={copyUpiId}
                           className="text-[10px] text-orange-700 font-bold hover:underline cursor-pointer"
                         >
-                          {copiedUpi ? "✓ कॉपी हो गया!" : "कॉपीड टू क्लिपबोर्ड"}
+                          {copiedUpi ? "✓ कॉपी हो गया!" : "UPI ID कॉपी करें"}
                         </button>
                       </div>
 
                       <div className="flex flex-col items-center justify-center p-2 bg-orange-50 border border-orange-200 rounded-xl shrink-0">
                         <QrCode className="w-16 h-16 text-orange-950" />
-                        <span className="text-[10px] font-black text-orange-700 mt-1">₹{membershipFee} QR Scan</span>
+                        <span className="text-[10px] font-black text-orange-700 mt-1">₹{membershipFee} QR Code</span>
                       </div>
                     </div>
 
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <label className="block text-xs font-black text-slate-900">
-                          भुगतान का UTR / Transaction Reference ID (12 अंक):
+                          भुगतान UTR / Reference ID (12 अंक):
                         </label>
                         {utrNumber.trim().length > 0 && (
                           <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
@@ -499,7 +504,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
                               ? "bg-emerald-100 text-emerald-800 border border-emerald-300" 
                               : "bg-red-100 text-red-800 border border-red-300"
                           }`}>
-                            {validateUtrNumber(utrNumber).isValid ? "✓ प्रारूप सही है" : "❌ अमान्य प्रारूप"}
+                            {validateUtrNumber(utrNumber).isValid ? "✓ UTR सही है" : "❌ अमान्य UTR"}
                           </span>
                         )}
                       </div>
@@ -508,7 +513,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
                         type="text"
                         value={utrNumber}
                         onChange={(e) => setUtrNumber(e.target.value)}
-                        placeholder="उदा. 420192847120 (12-अंकीय UTR दर्ज करें)"
+                        placeholder="उदा. 420192847120 (यदि उपलब्ध हो तो UTR दर्ज करें)"
                         className={`w-full px-3.5 py-2.5 bg-white border-2 rounded-xl text-slate-900 font-mono text-xs focus:outline-none transition-all ${
                           utrNumber.trim().length === 0
                             ? "border-orange-300 focus:border-orange-500"
@@ -533,7 +538,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
                         </div>
                       ) : (
                         <p className="text-[11px] text-slate-600 font-medium">
-                          💡 <strong>संकेत:</strong> PhonePe/Paytm/GPay में पेमेंट पूरा होने पर 12-अंकीय UTR/UPI Ref ID दर्ज करें।
+                          💡 <strong>संकेत:</strong> यदि UTR दर्ज नहीं है, तो पुष्टि बटन दबाते ही डिजिटल ID कार्ड जनरेट हो जाएगा।
                         </p>
                       )}
                     </div>
@@ -566,8 +571,8 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
 
             {/* Right Badge Preview Column */}
             <div className="lg:col-span-5 space-y-6">
-              <div className="bg-white border border-orange-200 rounded-3xl p-6 sm:p-8 space-y-6 shadow-md">
-                <div className="border-b border-orange-200 pb-3 flex items-center justify-between">
+              <div className="printable-receipt bg-white border border-orange-200 rounded-3xl p-6 sm:p-8 space-y-6 shadow-md">
+                <div className="border-b border-orange-200 pb-3 flex items-center justify-between no-print">
                   <h3 className="text-xs font-black uppercase text-orange-950 tracking-wider">
                     डिजिटल पार्टी पहचान पत्र (Digital ID Card)
                   </h3>
