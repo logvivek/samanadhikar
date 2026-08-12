@@ -65,28 +65,57 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
 
   const selectedPreset = DONATION_PRESETS.find(p => p.amount === amount);
 
-  // NPCI Spec compliant UPI URI builder with proper URL-encoding (%40 for @) & mandatory merchant tags
-  const getUpiUrl = (app: "phonepe" | "paytm" | "gpay" | "upi") => {
-    const vpa = encodeURIComponent("samanadhikarparty@sbi"); // samanadhikarparty%40sbi
-    const name = encodeURIComponent("Saman Adhikar Party");
-    const note = encodeURIComponent(`Donation Saman Adhikar Party`);
-    const amtStr = Number(amount || 0).toFixed(2);
-    const txnId = `SAP${Date.now()}`;
-    const mc = "8699";
-    const query = `pa=${vpa}&pn=${name}&mc=${mc}&tr=${txnId}&tn=${note}&am=${amtStr}&cu=INR&mode=02`;
+  // Function to generate a completely unique transaction ID based on app prefix
+  const generateTxnRefId = (appPrefix: string = "SMP") => {
+    const timestamp = Date.now();
+    const randomHex = Math.random().toString(16).substring(2, 8).toUpperCase();
+    return `${appPrefix}${timestamp}${randomHex}`;
+  };
 
-    if (app === "phonepe") return `phonepe://pay?${query}`;
-    if (app === "paytm") return `paytmmp://pay?${query}`;
-    if (app === "gpay") return `gpay://upi/pay?${query}`;
+  // NPCI / PhonePe / Paytm / GPay Spec compliant UPI URI builder
+  const getUpiUrl = (app: "phonepe" | "paytm" | "gpay" | "upi", noteOverride?: string) => {
+    const payeeVpa = "samanadhikarparty@sbi";
+    const payeeName = "Samanadhikar Party";
+    const merchantCode = "8651"; // Political Organizations
+    const txnNote = noteOverride || "Website Contribution";
+
+    let appPrefix = "SMP";
+    if (app === "paytm") appPrefix = "PTM";
+    if (app === "gpay") appPrefix = "GPY";
+
+    const txnRefId = generateTxnRefId(appPrefix);
+    const amtStr = amount ? Number(amount).toFixed(2) : "";
+
+    const query = `pa=${encodeURIComponent(payeeVpa)}` +
+      `&pn=${encodeURIComponent(payeeName)}` +
+      `&mc=${encodeURIComponent(merchantCode)}` +
+      `&tr=${encodeURIComponent(txnRefId)}` +
+      `&tn=${encodeURIComponent(txnNote)}` +
+      `&cu=INR` +
+      `${amtStr ? `&am=${encodeURIComponent(amtStr)}` : ''}`;
+
+    if (app === "phonepe") {
+      return `phonepe://pay?${query}`;
+    }
+
+    if (app === "paytm") {
+      return `paytmmp://pay?${query}`;
+    }
+
+    if (app === "gpay") {
+      const userAgent = typeof navigator !== "undefined" ? (navigator.userAgent || navigator.vendor || (window as any).opera || "") : "";
+      const isAndroid = /android/i.test(userAgent);
+      if (isAndroid) {
+        return `intent://pay?${query}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`;
+      }
+      return `upi://pay?${query}`;
+    }
+
     return `upi://pay?${query}`;
   };
 
-  const getStandardUpiUrl = () => {
-    const vpa = encodeURIComponent("samanadhikarparty@sbi");
-    const name = encodeURIComponent("Samanadhikar Party");
-    const amtStr = Number(amount || 0).toFixed(2);
-    const txnId = `SAP${Date.now()}`;
-    return `upi://pay?pa=${vpa}&pn=${name}&am=${amtStr}&cu=INR&mc=8699&tr=${txnId}`;
+  const getStandardUpiUrl = (noteOverride?: string) => {
+    return getUpiUrl("upi", noteOverride);
   };
 
   const handleCopy = (text: string, fieldName: string) => {

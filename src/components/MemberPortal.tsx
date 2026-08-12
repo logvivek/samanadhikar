@@ -65,7 +65,34 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [activeMemberCard, setActiveMemberCard] = useState<MemberRecord | null>(null);
 
-  // Roster state
+  // Function to generate a completely unique transaction ID (under 35 chars)
+  const generateTxnRefId = () => {
+    const timestamp = Date.now();
+    const randomHex = Math.random().toString(16).substring(2, 8).toUpperCase();
+    return `SMP${timestamp}${randomHex}`;
+  };
+
+  const getUpiPaymentUrl = (app: "phonepe" | "paytm" | "gpay" | "upi") => {
+    const payeeVpa = "samanadhikarparty@sbi";
+    const payeeName = "Samanadhikar Party";
+    const merchantCode = "8651"; // Political Organizations
+    const txnNote = "Member Registration";
+    const txnRefId = generateTxnRefId();
+    const amtStr = membershipFee ? Number(membershipFee).toFixed(2) : "";
+
+    const query = `pa=${encodeURIComponent(payeeVpa)}` +
+      `&pn=${encodeURIComponent(payeeName)}` +
+      `&mc=${encodeURIComponent(merchantCode)}` +
+      `&tr=${encodeURIComponent(txnRefId)}` +
+      `&tn=${encodeURIComponent(txnNote)}` +
+      `&cu=INR` +
+      `${amtStr ? `&am=${encodeURIComponent(amtStr)}` : ''}`;
+
+    if (app === "phonepe") return `phonepe://pay?${query}`;
+    if (app === "paytm") return `paytmmp://pay?${query}`;
+    if (app === "gpay") return `gpay://upi/pay?${query}`;
+    return `upi://pay?${query}`;
+  };
   const [membersList, setMembersList] = useState<MemberRecord[]>([]);
   const [totalCount, setTotalCount] = useState<number>(1450);
 
@@ -423,16 +450,12 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
                     
                     {paymentApp === "phonepe" && (
                       <div className="p-3 bg-purple-50 border border-purple-200 rounded-xl space-y-2">
-                        <div className="font-black text-purple-950 text-xs">PhonePe Gateway (%40 Encoded VPA & Merchant Tags):</div>
+                        <div className="font-black text-purple-950 text-xs">PhonePe Gateway (Political Org Merchant 8651 & Encoded VPA):</div>
                         <div className="flex flex-wrap items-center gap-2">
                           <button
                             type="button"
                             onClick={() => {
-                              const txnId = `SAPMEMBER${Date.now()}`;
-                              const vpa = encodeURIComponent("samanadhikarparty@sbi");
-                              const name = encodeURIComponent("Saman Adhikar Party");
-                              const upiUrl = `phonepe://pay?pa=${vpa}&pn=${name}&mc=8699&tr=${txnId}&tn=MemberRegistration&am=${membershipFee}&cu=INR&mode=02`;
-                              window.location.href = upiUrl;
+                              window.location.href = getUpiPaymentUrl("phonepe");
                             }}
                             className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-black text-xs shadow cursor-pointer hover:scale-105 transition-all"
                           >
@@ -440,7 +463,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
                             <span>PhonePe ऐप खोलें (Pay ₹{membershipFee})</span>
                           </button>
                           <a
-                            href={`upi://pay?pa=${encodeURIComponent("samanadhikarparty@sbi")}&pn=${encodeURIComponent("Samanadhikar Party")}&am=${membershipFee}&cu=INR&mc=8699&tr=SAPMEMBER${Date.now()}`}
+                            href={getUpiPaymentUrl("upi")}
                             className="px-3 py-2 rounded-xl bg-purple-100 hover:bg-purple-200 text-purple-950 font-black text-xs border border-purple-300"
                           >
                             Direct Link (PhonePe / UPI)
@@ -459,11 +482,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
                           <button
                             type="button"
                             onClick={() => {
-                              const txnId = `SAPMEMBER${Date.now()}`;
-                              const vpa = encodeURIComponent("samanadhikarparty@sbi");
-                              const name = encodeURIComponent("Saman Adhikar Party");
-                              const upiUrl = `paytmmp://pay?pa=${vpa}&pn=${name}&mc=8699&tr=${txnId}&tn=MemberRegistration&am=${membershipFee}&cu=INR&mode=02`;
-                              window.location.href = upiUrl;
+                              window.location.href = getUpiPaymentUrl("paytm");
                             }}
                             className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-black text-xs shadow cursor-pointer hover:scale-105 transition-all"
                           >
@@ -471,7 +490,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
                             <span>Paytm ऐप खोलें (Pay ₹{membershipFee})</span>
                           </button>
                           <a
-                            href={`upi://pay?pa=${encodeURIComponent("samanadhikarparty@sbi")}&pn=${encodeURIComponent("Samanadhikar Party")}&am=${membershipFee}&cu=INR&mc=8699&tr=SAPMEMBER${Date.now()}`}
+                            href={getUpiPaymentUrl("upi")}
                             className="px-3 py-2 rounded-xl bg-sky-100 hover:bg-sky-200 text-sky-950 font-black text-xs border border-sky-300"
                           >
                             Direct Link (Paytm / UPI)
@@ -490,11 +509,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
                           <button
                             type="button"
                             onClick={() => {
-                              const txnId = `SAPMEMBER${Date.now()}`;
-                              const vpa = encodeURIComponent("samanadhikarparty@sbi");
-                              const name = encodeURIComponent("Saman Adhikar Party");
-                              const upiUrl = `gpay://upi/pay?pa=${vpa}&pn=${name}&mc=8699&tr=${txnId}&tn=MemberRegistration&am=${membershipFee}&cu=INR&mode=02`;
-                              window.location.href = upiUrl;
+                              window.location.href = getUpiPaymentUrl("gpay");
                             }}
                             className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-black text-xs shadow cursor-pointer hover:scale-105 transition-all"
                           >
@@ -502,7 +517,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
                             <span>Google Pay खोलें (Pay ₹{membershipFee})</span>
                           </button>
                           <a
-                            href={`upi://pay?pa=${encodeURIComponent("samanadhikarparty@sbi")}&pn=${encodeURIComponent("Samanadhikar Party")}&am=${membershipFee}&cu=INR&mc=8699&tr=SAPMEMBER${Date.now()}`}
+                            href={getUpiPaymentUrl("upi")}
                             className="px-3 py-2 rounded-xl bg-teal-100 hover:bg-teal-200 text-teal-950 font-black text-xs border border-teal-300"
                           >
                             Direct Link (GPay / UPI)
