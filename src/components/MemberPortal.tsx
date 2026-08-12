@@ -72,24 +72,22 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
     return `${prefix}${timestamp}${randomSuffix}`;
   };
 
-  // Full NPCI Compliant UPI Parameter Builder for Member Registration
+  // Full NPCI Compliant Direct VPA Parameter Builder (Direct Peer-to-Organization Transfer)
+  // Omitting merchant-specific parameters (mc, mode=02, orgid) prevents PhonePe/GPay from misidentifying
+  // standard party VPAs as merchant accounts and throwing "UPI payments are not allowed on account type" errors.
   const getNpciMemberParams = (noteOverride?: string, prefix: string = "SMP") => {
     const payeeVpa = "samanadhikarparty@sbi";
     const payeeName = encodeURIComponent("Samanadhikar Party");
-    const merchantCode = "8651"; // Political Organizations
     const txnRef = generateMemberTxnRef(prefix);
     const txnNote = encodeURIComponent(noteOverride || "Member Registration");
     const amtStr = membershipFee && Number(membershipFee) > 0 ? Number(membershipFee).toFixed(2) : "100.00";
 
     return `pa=${payeeVpa}` +
       `&pn=${payeeName}` +
-      `&mc=${merchantCode}` +
       `&tr=${txnRef}` +
       `&tn=${txnNote}` +
       `&am=${amtStr}` +
-      `&cu=INR` +
-      `&mode=02` +
-      `&orgid=000000`;
+      `&cu=INR`;
   };
 
   // Clean NPCI UPI URL for Member Registration
