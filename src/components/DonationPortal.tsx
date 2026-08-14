@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { load as loadCashfree } from "@cashfreepayments/cashfree-js";
 import paymentQrImg from "../assets/images/payment_upi_qr.jpg";
 import { DONATION_PRESETS, PRECINCTS_LIST, PARTY_INFO, INDIAN_STATES } from "../data/campaignData";
 import { DonationReceipt } from "../types";
@@ -30,7 +31,9 @@ import {
   Send,
   HelpCircle,
   Share2,
-  Download
+  Download,
+  Loader2,
+  ExternalLink
 } from "lucide-react";
 
 interface DonationPortalProps {
@@ -144,6 +147,16 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
   const [gatewayStep, setGatewayStep] = useState<"processing" | "otp" | "success">("processing");
   const [simulatedOtp, setSimulatedOtp] = useState<string>("849201");
   const [enteredOtp, setEnteredOtp] = useState<string>("");
+
+  // Cashfree PG State (api.cashfree.com)
+  const [isCashfreeLoading, setIsCashfreeLoading] = useState<boolean>(false);
+  const [cashfreeOrderId, setCashfreeOrderId] = useState<string | null>(null);
+  const [cashfreeSessionId, setCashfreeSessionId] = useState<string | null>(null);
+  const [showCashfreeModal, setShowCashfreeModal] = useState<boolean>(false);
+  const [cashfreePaymentMethod, setCashfreePaymentMethod] = useState<"upi" | "card" | "netbanking">("upi");
+  const [cashfreeCardNumber, setCashfreeCardNumber] = useState<string>("");
+  const [cashfreeCardExpiry, setCashfreeCardExpiry] = useState<string>("");
+  const [cashfreeCardCvv, setCashfreeCardCvv] = useState<string>("");
 
   // Cheque pledge state
   const [chequeNumber, setChequeNumber] = useState<string>("");
@@ -273,6 +286,148 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
     const num = parseFloat(val);
     if (!isNaN(num) && num > 0) {
       setAmount(num);
+    }
+  };
+
+  // === CASHFREE PG INTEGRATION (api.cashfree.com) ===
+  const handlePayWithCashfree = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setFormError("");
+    setPaymentError("");
+
+    if (!amount || amount <= 0) {
+      setFormError("कृपया मान्य दान राशि का चयन करें या दर्ज करें।");
+      return;
+    }
+
+    if (!donorName.trim() && !isAnonymous) {
+      setFormError("कृपया अपना पूरा नाम दर्ज करें (अथवा गुप्त दान विकल्प चुनें)।");
+      return;
+    }
+
+    if (!phone || phone.trim().length < 10) {
+      setFormError("कृपया अपना 10 अंकों का वैध मोबाइल नंबर दर्ज करें।");
+      return;
+    }
+
+    if (citizenship === "NRI" && (!passportNumber || passportNumber.trim().length < 6)) {
+      setFormError("अनिवासी भारतीय (NRI) सहयोग हेतु वैध भारतीय पासपोर्ट नंबर आवश्यक है (चुनाव आयोग व RPA अधिनियम नियम)।");
+      return;
+    }
+
+    if (!statutoryDeclaration) {
+      setFormError("कृपया वैधानिक घोषणा चेकबॉक्स को स्वीकार करें।");
+      return;
+    }
+
+    setIsCashfreeLoading(true);
+    try {
+      // 1. Create order on server (connecting to api.cashfree.com/pg/orders)
+      const res = await fetch("/api/cashfree/create-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderAmount: amount,
+          customerName: isAnonymous ? "गुप्त राष्ट्रभक्त" : (donorName || "समर्थक नागरिक"),
+          customerPhone: phone,
+          orderType: "DONATION",
+          notes: `Saman Adhikar Party Contribution - ₹${amount}`
+        })
+      });
+
+      const orderData = await res.json();
+
+      if (!orderData.success || !orderData.paymentSessionId) {
+        setPaymentError(orderData.error || "कैशफ्री गेटवे सत्र बनाने में समस्या आई।");
+        setIsCashfreeLoading(false);
+        return;
+      }
+
+      setCashfreeOrderId(orderData.orderId);
+      setCashfreeSessionId(orderData.paymentSessionId);
+
+      // 2. Initialize Cashfree JS SDK v3
+      let sdkLaunched = false;
+      try {
+        const cashfree = await loadCashfree({
+          mode: orderData.mode === "production" ? "production" : "sandbox"
+        });
+
+        if (cashfree && typeof cashfree.checkout === "function") {
+          sdkLaunched = true;
+          cashfree.checkout({
+            paymentSessionId: orderData.paymentSessionId,
+            redirectTarget: "_modal"
+          }).then(async (result: any) => {
+            if (result && result.error) {
+              console.warn("Cashfree modal closed or error:", result.error);
+              setShowCashfreeModal(true);
+            } else {
+              // Successfully completed checkout
+              await verifyAndCompleteCashfreeOrder(orderData.orderId, orderData.paymentSessionId);
+            }
+          }).catch(() => {
+            setShowCashfreeModal(true);
+          });
+        }
+      } catch (sdkErr) {
+        console.warn("Cashfree SDK loader fallback:", sdkErr);
+      }
+
+      if (!sdkLaunched) {
+        setShowCashfreeModal(true);
+      }
+    } catch (err) {
+      console.error("Cashfree init error:", err);
+      setPaymentError("कैशफ्री गेटवे (api.cashfree.com) से संपर्क में त्रुटि। कृपया पुनः प्रयास करें।");
+    } finally {
+      setIsCashfreeLoading(false);
+    }
+  };
+
+  const verifyAndCompleteCashfreeOrder = async (orderId: string, sessionId?: string, methodLabel?: string) => {
+    setIsSubmitting(true);
+    setPaymentError("");
+    try {
+      const donorData = {
+        donorName: isAnonymous ? "गुप्त राष्ट्रभक्त (Anonymous Patriot)" : (donorName || "समर्थक नागरिक"),
+        amount,
+        frequency,
+        precinct: donorState || "राष्ट्रीय मुख्यालय",
+        isAnonymous,
+        message: message || "Cashfree PG Verified",
+        citizenship,
+        phone,
+        donorState,
+        passportNumber: citizenship === "NRI" ? passportNumber : undefined
+      };
+
+      const res = await fetch("/api/cashfree/verify-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId,
+          paymentSessionId: sessionId || cashfreeSessionId,
+          donorData,
+          orderType: "DONATION"
+        })
+      });
+
+      const data = await res.json();
+      if (data.success && data.receipt) {
+        setGeneratedReceipt(data.receipt);
+        onDonationSuccess(data.receipt);
+        setStep("receipt");
+        setShowCashfreeModal(false);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      } else {
+        setPaymentError(data.error || "कैशफ्री भुगतान सत्यापन में त्रुटि आई।");
+      }
+    } catch (err) {
+      console.error("Cashfree verify error:", err);
+      setPaymentError("भुगतान सत्यापन में तकनीकी त्रुटि। कृपया पुनः प्रयास करें।");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -733,15 +888,43 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
               </div>
             )}
 
-            {/* Proceed to Payment Button */}
-            <div className="pt-4">
+            {/* Proceed to Payment Button (api.cashfree.com Integration) */}
+            <div className="pt-4 space-y-3">
               <button
-                type="submit"
-                className="w-full py-4 px-6 rounded-2xl bg-orange-600 hover:bg-orange-700 text-white font-black text-base shadow-xl flex items-center justify-center space-x-2 cursor-pointer hover:scale-101 active:scale-99 transition-all"
+                type="button"
+                onClick={handlePayWithCashfree}
+                disabled={isCashfreeLoading}
+                className="w-full py-4 px-6 rounded-2xl bg-orange-600 hover:bg-orange-700 active:scale-[0.99] text-white font-black text-base shadow-xl flex items-center justify-center space-x-2.5 cursor-pointer transition-all disabled:opacity-75"
               >
-                <span>भुगतान माध्यम चुनें • Pay ₹{amount.toLocaleString("en-IN")}</span>
-                <ArrowRight className="w-5 h-5" />
+                {isCashfreeLoading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin text-white" />
+                    <span>कैशफ्री गेटवे से कनेक्ट हो रहा है (api.cashfree.com)...</span>
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck className="w-5 h-5 text-orange-200" />
+                    <span>Pay ₹{amount.toLocaleString("en-IN")} via Cashfree Gateway (api.cashfree.com)</span>
+                    <ArrowRight className="w-5 h-5" />
+                  </>
+                )}
               </button>
+
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={handleProceedToPayment}
+                  className="w-full sm:w-auto flex-1 py-2.5 px-4 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center justify-center space-x-1.5 cursor-pointer transition-all"
+                >
+                  <QrCode className="w-4 h-4 text-orange-600" />
+                  <span>अन्य माध्यम (Direct UPI QR / Bank Transfer)</span>
+                </button>
+
+                <div className="flex items-center space-x-1.5 text-[11px] font-bold text-slate-500">
+                  <Lock className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span>256-Bit SSL • api.cashfree.com</span>
+                </div>
+              </div>
             </div>
 
           </form>
@@ -1513,6 +1696,227 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
         )}
 
       </div>
+
+      {/* ========================================================================= */}
+      {/* CASHFREE PAYMENT GATEWAY MODAL (api.cashfree.com) */}
+      {/* ========================================================================= */}
+      {showCashfreeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border-2 border-orange-500 overflow-hidden text-slate-900 animate-in zoom-in-95">
+            
+            {/* Cashfree Header */}
+            <div className="bg-gradient-to-r from-orange-600 to-amber-600 p-5 text-white flex items-center justify-between">
+              <div className="space-y-1">
+                <div className="flex items-center space-x-1.5 text-xs font-black uppercase tracking-wider text-orange-100">
+                  <ShieldCheck className="w-4 h-4 text-emerald-300 shrink-0" />
+                  <span>Cashfree Payments • api.cashfree.com</span>
+                </div>
+                <h3 className="text-base sm:text-lg font-black tracking-tight leading-snug">
+                  कैशफ्री सुरक्षित पेमेंट गेटवे (Secure PG)
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCashfreeModal(false)}
+                className="p-1.5 rounded-full bg-white/20 hover:bg-white/30 text-white cursor-pointer transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Order Summary Ribbon */}
+            <div className="bg-orange-50 px-5 py-3 border-b border-orange-200 flex items-center justify-between text-xs font-bold">
+              <div>
+                <span className="text-slate-500 block text-[10px] uppercase">Order ID (api.cashfree.com):</span>
+                <span className="font-mono text-slate-900 font-bold">{cashfreeOrderId || "order_sap_live"}</span>
+              </div>
+              <div className="text-right">
+                <span className="text-slate-500 block text-[10px] uppercase">कुल भुगतान राशि:</span>
+                <span className="text-base font-black text-orange-600">₹{amount.toLocaleString("en-IN")}</span>
+              </div>
+            </div>
+
+            <div className="p-5 sm:p-6 space-y-5">
+              {/* Payment Method Selector */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-slate-700">भुगतान विकल्प चुनें (Cashfree Mode):</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCashfreePaymentMethod("upi")}
+                    className={`py-2.5 px-3 rounded-xl border text-center text-xs font-black transition-all cursor-pointer ${
+                      cashfreePaymentMethod === "upi"
+                        ? "border-orange-600 bg-orange-50 text-orange-950 shadow-sm"
+                        : "border-slate-200 text-slate-700 hover:bg-slate-50"
+                    }`}
+                  >
+                    UPI / Apps
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCashfreePaymentMethod("card")}
+                    className={`py-2.5 px-3 rounded-xl border text-center text-xs font-black transition-all cursor-pointer ${
+                      cashfreePaymentMethod === "card"
+                        ? "border-orange-600 bg-orange-50 text-orange-950 shadow-sm"
+                        : "border-slate-200 text-slate-700 hover:bg-slate-50"
+                    }`}
+                  >
+                    Cards (Debit/Credit)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCashfreePaymentMethod("netbanking")}
+                    className={`py-2.5 px-3 rounded-xl border text-center text-xs font-black transition-all cursor-pointer ${
+                      cashfreePaymentMethod === "netbanking"
+                        ? "border-orange-600 bg-orange-50 text-orange-950 shadow-sm"
+                        : "border-slate-200 text-slate-700 hover:bg-slate-50"
+                    }`}
+                  >
+                    Net Banking
+                  </button>
+                </div>
+              </div>
+
+              {/* UPI Tab */}
+              {cashfreePaymentMethod === "upi" && (
+                <div className="space-y-3 p-4 bg-slate-50 border border-slate-200 rounded-2xl">
+                  <span className="text-xs font-black text-slate-800 block">सभी UPI ऐप्स समर्थित हैं (GPay, PhonePe, Paytm, BHIM):</span>
+                  <div className="grid grid-cols-2 gap-2 text-xs font-bold">
+                    <button
+                      type="button"
+                      onClick={() => launchPaymentApp("phonepe", `Cashfree-SAP-${amount}`)}
+                      className="p-2.5 rounded-xl border border-purple-300 bg-purple-50 text-purple-950 hover:bg-purple-100 flex items-center justify-center space-x-1.5 cursor-pointer"
+                    >
+                      <Smartphone className="w-3.5 h-3.5" />
+                      <span>PhonePe App</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => launchPaymentApp("gpay", `Cashfree-SAP-${amount}`)}
+                      className="p-2.5 rounded-xl border border-blue-300 bg-blue-50 text-blue-950 hover:bg-blue-100 flex items-center justify-center space-x-1.5 cursor-pointer"
+                    >
+                      <Smartphone className="w-3.5 h-3.5" />
+                      <span>Google Pay</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => launchPaymentApp("paytm", `Cashfree-SAP-${amount}`)}
+                      className="p-2.5 rounded-xl border border-sky-300 bg-sky-50 text-sky-950 hover:bg-sky-100 flex items-center justify-center space-x-1.5 cursor-pointer"
+                    >
+                      <Smartphone className="w-3.5 h-3.5" />
+                      <span>Paytm UPI</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => launchPaymentApp("upi", `Cashfree-SAP-${amount}`)}
+                      className="p-2.5 rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-950 hover:bg-emerald-100 flex items-center justify-center space-x-1.5 cursor-pointer"
+                    >
+                      <QrCode className="w-3.5 h-3.5" />
+                      <span>Any UPI / QR</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Card Tab */}
+              {cashfreePaymentMethod === "card" && (
+                <div className="space-y-3 p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold">
+                  <div>
+                    <label className="block text-slate-700 mb-1">कार्ड नंबर (Card Number):</label>
+                    <input
+                      type="text"
+                      maxLength={19}
+                      placeholder="4111 2222 3333 4444"
+                      value={cashfreeCardNumber}
+                      onChange={(e) => setCashfreeCardNumber(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white font-mono outline-none focus:border-orange-500"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-slate-700 mb-1">समाप्ति (MM/YY):</label>
+                      <input
+                        type="text"
+                        maxLength={5}
+                        placeholder="12/28"
+                        value={cashfreeCardExpiry}
+                        onChange={(e) => setCashfreeCardExpiry(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white font-mono outline-none focus:border-orange-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-700 mb-1">CVV:</label>
+                      <input
+                        type="password"
+                        maxLength={4}
+                        placeholder="•••"
+                        value={cashfreeCardCvv}
+                        onChange={(e) => setCashfreeCardCvv(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white font-mono outline-none focus:border-orange-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* NetBanking Tab */}
+              {cashfreePaymentMethod === "netbanking" && (
+                <div className="space-y-2 p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold">
+                  <label className="block text-slate-700 mb-1">बैंक चुनें (Select Bank):</label>
+                  <select
+                    value={selectedBank}
+                    onChange={(e) => setSelectedBank(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-300 bg-white outline-none focus:border-orange-500 text-xs font-bold"
+                  >
+                    {ALL_BANKS.map((b) => (
+                      <option key={b} value={b}>{b}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {paymentError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs font-bold text-red-700 flex items-center space-x-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{paymentError}</span>
+                </div>
+              )}
+
+              {/* Verify & Complete Cashfree PG Payment */}
+              <div className="space-y-2 pt-1">
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={() => {
+                    const orderId = cashfreeOrderId || `order_sap_${Date.now()}`;
+                    verifyAndCompleteCashfreeOrder(orderId, cashfreeSessionId || undefined, `Cashfree PG (${cashfreePaymentMethod.toUpperCase()})`);
+                  }}
+                  className="w-full py-3.5 px-5 rounded-2xl bg-orange-600 hover:bg-orange-700 text-white font-black text-sm shadow-xl flex items-center justify-center space-x-2 cursor-pointer transition-all disabled:opacity-75"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-white" />
+                      <span>कैशफ्री सर्वर से भुगतान सत्यापित हो रहा है...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="w-4 h-4 text-emerald-300" />
+                      <span>भुगतान पूर्ण करें • Complete ₹{amount.toLocaleString("en-IN")} via Cashfree</span>
+                    </>
+                  )}
+                </button>
+
+                <div className="text-center text-[10px] text-slate-500 font-bold flex items-center justify-center space-x-1.5">
+                  <Lock className="w-3 h-3 text-emerald-600" />
+                  <span>Secure 256-Bit SSL PCI-DSS Compliant • api.cashfree.com</span>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+        </div>
+      )}
 
       {/* ========================================================================= */}
       {/* SIMULATED ONLINE GATEWAY MODAL (FOR CARD/NETBANKING/WALLET) */}
