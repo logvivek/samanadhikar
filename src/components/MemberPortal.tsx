@@ -96,7 +96,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
     return `upi://pay?${params}`;
   };
 
-  const launchMemberPaymentApp = (app: "phonepe" | "paytm" | "gpay" | "upi", noteOverride?: string) => {
+  const getMemberAppIntentUrl = (app: "phonepe" | "paytm" | "gpay" | "upi", noteOverride?: string) => {
     const userAgent = typeof navigator !== "undefined" ? (navigator.userAgent || navigator.vendor || "") : "";
     const isAndroid = /android/i.test(userAgent);
     const isIos = /iphone|ipad|ipod/i.test(userAgent);
@@ -107,74 +107,43 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
 
     if (app === "phonepe") {
       if (isAndroid) {
-        const androidPhonePeIntent = `intent://pay?${params}#Intent;scheme=upi;package=com.phonepe.app;end`;
-        try {
-          window.location.href = androidPhonePeIntent;
-          setTimeout(() => { window.location.href = universalUrl; }, 600);
-        } catch (e) {
-          window.location.href = universalUrl;
-        }
+        return `intent://pay?${params}#Intent;scheme=upi;package=com.phonepe.app;end`;
       } else if (isIos) {
-        const phonepeIosUrl = `phonepe://pay?${params}`;
-        try {
-          window.location.href = phonepeIosUrl;
-          setTimeout(() => { window.location.href = universalUrl; }, 600);
-        } catch (e) {
-          window.location.href = universalUrl;
-        }
-      } else {
-        window.location.href = universalUrl;
+        return `phonepe://pay?${params}`;
       }
-      return;
+      return universalUrl;
     }
 
     if (app === "paytm") {
       if (isAndroid) {
-        const androidPaytmIntent = `intent://pay?${params}#Intent;scheme=upi;package=net.one97.paytm;end`;
-        try {
-          window.location.href = androidPaytmIntent;
-          setTimeout(() => { window.location.href = universalUrl; }, 600);
-        } catch (e) {
-          window.location.href = universalUrl;
-        }
+        return `intent://pay?${params}#Intent;scheme=upi;package=net.one97.paytm;end`;
       } else if (isIos) {
-        const paytmIosUrl = `paytmmp://pay?${params}`;
-        try {
-          window.location.href = paytmIosUrl;
-          setTimeout(() => { window.location.href = universalUrl; }, 600);
-        } catch (e) {
-          window.location.href = universalUrl;
-        }
-      } else {
-        window.location.href = universalUrl;
+        return `paytmmp://pay?${params}`;
       }
-      return;
+      return universalUrl;
     }
 
     if (app === "gpay") {
       if (isAndroid) {
-        const androidGPayIntent = `intent://pay?${params}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`;
-        try {
-          window.location.href = androidGPayIntent;
-          setTimeout(() => { window.location.href = universalUrl; }, 600);
-        } catch (e) {
-          window.location.href = universalUrl;
-        }
+        return `intent://pay?${params}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`;
       } else if (isIos) {
-        const gpayIosUrl = `gpay://upi/pay?${params}`;
-        try {
-          window.location.href = gpayIosUrl;
-          setTimeout(() => { window.location.href = universalUrl; }, 600);
-        } catch (e) {
-          window.location.href = universalUrl;
-        }
-      } else {
-        window.location.href = universalUrl;
+        return `gpay://upi/pay?${params}`;
       }
-      return;
+      return universalUrl;
     }
 
-    window.location.href = universalUrl;
+    return universalUrl;
+  };
+
+  const launchMemberPaymentApp = (app: "phonepe" | "paytm" | "gpay" | "upi", noteOverride?: string) => {
+    const targetUrl = getMemberAppIntentUrl(app, noteOverride);
+    const universalUrl = `upi://pay?${getNpciMemberParams(noteOverride, "MUPI")}`;
+
+    try {
+      window.location.href = targetUrl;
+    } catch (e) {
+      window.location.href = universalUrl;
+    }
   };
 
   const getUpiPaymentUrl = (app: "phonepe" | "paytm" | "gpay" | "upi") => {
@@ -539,8 +508,8 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
                       <div className="p-3 bg-purple-50 border border-purple-200 rounded-xl space-y-2">
                         <div className="font-black text-purple-950 text-xs">PhonePe Gateway (Direct VPA Transfer):</div>
                         <div className="flex flex-wrap items-center gap-2">
-                          <button
-                            type="button"
+                          <a
+                            href={getMemberAppIntentUrl("phonepe")}
                             onClick={() => {
                               launchMemberPaymentApp("phonepe");
                             }}
@@ -548,7 +517,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
                           >
                             <Smartphone className="w-4 h-4 text-white" />
                             <span>PhonePe ऐप खोलें (Pay ₹{membershipFee})</span>
-                          </button>
+                          </a>
                           <a
                             href={getCleanUpiPaymentUrl()}
                             className="px-3 py-2 rounded-xl bg-purple-100 hover:bg-purple-200 text-purple-950 font-black text-xs border border-purple-300"

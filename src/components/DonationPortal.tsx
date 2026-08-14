@@ -98,87 +98,54 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
   };
 
   // Dedicated multi-stage app launcher as per PhonePe, Paytm, and Google Pay NPCI Direct Integration guidelines
-  const launchPaymentApp = (app: "phonepe" | "paytm" | "gpay" | "upi", noteOverride?: string) => {
+  const getAppIntentUrl = (app: "phonepe" | "paytm" | "gpay" | "upi", noteOverride?: string) => {
     const userAgent = typeof navigator !== "undefined" ? (navigator.userAgent || navigator.vendor || "") : "";
     const isAndroid = /android/i.test(userAgent);
     const isIos = /iphone|ipad|ipod/i.test(userAgent);
 
     const prefixMap = { phonepe: "PPE", paytm: "PTM", gpay: "GPY", upi: "UPI" };
-    // PhonePe can reject some app-intent payload variants; use strict UPI params without txnRef first.
-    const params = getNpciParams(noteOverride, app !== "phonepe", prefixMap[app] || "SAP");
+    const params = getNpciParams(noteOverride, true, prefixMap[app] || "SAP");
     const universalUrl = `upi://pay?${params}`;
 
     if (app === "phonepe") {
-      if (isAndroid || isIos) {
-        const phonepeUrl = `phonepe://pay?${params}`;
-        try {
-          window.location.href = phonepeUrl;
-          setTimeout(() => { window.location.href = universalUrl; }, 900);
-        } catch (e) {
-          window.location.href = universalUrl;
-        }
+      if (isAndroid) {
+        return `intent://pay?${params}#Intent;scheme=upi;package=com.phonepe.app;end`;
       } else if (isIos) {
-        const phonepeIosUrl = `phonepe://pay?${params}`;
-        try {
-          window.location.href = phonepeIosUrl;
-          setTimeout(() => { window.location.href = universalUrl; }, 600);
-        } catch (e) {
-          window.location.href = universalUrl;
-        }
-      } else {
-        window.location.href = universalUrl;
+        return `phonepe://pay?${params}`;
       }
-      return;
+      return universalUrl;
     }
 
     if (app === "paytm") {
       if (isAndroid) {
-        const androidPaytmIntent = `intent://pay?${params}#Intent;scheme=upi;package=net.one97.paytm;end`;
-        try {
-          window.location.href = androidPaytmIntent;
-          setTimeout(() => { window.location.href = universalUrl; }, 600);
-        } catch (e) {
-          window.location.href = universalUrl;
-        }
+        return `intent://pay?${params}#Intent;scheme=upi;package=net.one97.paytm;end`;
       } else if (isIos) {
-        const paytmIosUrl = `paytmmp://pay?${params}`;
-        try {
-          window.location.href = paytmIosUrl;
-          setTimeout(() => { window.location.href = universalUrl; }, 600);
-        } catch (e) {
-          window.location.href = universalUrl;
-        }
-      } else {
-        window.location.href = universalUrl;
+        return `paytmmp://pay?${params}`;
       }
-      return;
+      return universalUrl;
     }
 
     if (app === "gpay") {
       if (isAndroid) {
-        const androidGPayIntent = `intent://pay?${params}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`;
-        try {
-          window.location.href = androidGPayIntent;
-          setTimeout(() => { window.location.href = universalUrl; }, 600);
-        } catch (e) {
-          window.location.href = universalUrl;
-        }
+        return `intent://pay?${params}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`;
       } else if (isIos) {
-        const gpayIosUrl = `gpay://upi/pay?${params}`;
-        try {
-          window.location.href = gpayIosUrl;
-          setTimeout(() => { window.location.href = universalUrl; }, 600);
-        } catch (e) {
-          window.location.href = universalUrl;
-        }
-      } else {
-        window.location.href = universalUrl;
+        return `gpay://upi/pay?${params}`;
       }
-      return;
+      return universalUrl;
     }
 
-    // Universal UPI App Launcher
-    window.location.href = universalUrl;
+    return universalUrl;
+  };
+
+  const launchPaymentApp = (app: "phonepe" | "paytm" | "gpay" | "upi", noteOverride?: string) => {
+    const targetUrl = getAppIntentUrl(app, noteOverride);
+    const universalUrl = `upi://pay?${getNpciParams(noteOverride, true, "UPI")}`;
+
+    try {
+      window.location.href = targetUrl;
+    } catch (e) {
+      window.location.href = universalUrl;
+    }
   };
 
   const getStandardUpiUrl = (noteOverride?: string) => {
@@ -747,26 +714,29 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
                       <span className="text-xs bg-purple-200 text-purple-900 px-2 py-0.5 rounded font-mono">vpa: {officialUpiId}</span>
                     </div>
                     <p className="text-slate-700 font-bold text-xs">
-                      सुरक्षित VPA व शुद्ध NPCI UPI स्टैंडर्ड का उपयोग करके फोनपे ऐप खोलें।
+                      ब्राउज़र से सीधे फोनपे ऐप खोलने के लिए नीचे दिए गए बटन पर क्लिक करें। यदि आपके मोबाइल में PhonePe स्थापित है तो ऐप स्वतः खुल जाएगा।
                     </p>
                     <div className="flex flex-wrap items-center gap-2 pt-1">
-                      <button
-                        type="button"
-                        onClick={() => launchPaymentApp("phonepe")}
-                        className="px-5 py-3 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-black text-xs shadow-md flex items-center space-x-2 cursor-pointer hover:scale-105 active:scale-95 transition-all"
+                      <a
+                        href={getAppIntentUrl("phonepe")}
+                        onClick={(e) => {
+                          // Allow native link navigation, with fallback handler
+                          launchPaymentApp("phonepe");
+                        }}
+                        className="px-5 py-3 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-black text-xs shadow-md flex items-center space-x-2 cursor-pointer hover:scale-105 active:scale-95 transition-all text-center"
                       >
-                        <Smartphone className="w-4 h-4 text-white" />
-                        <span>PhonePe ऐप खोलें (Pay ₹{amount})</span>
-                      </button>
+                        <Smartphone className="w-4 h-4 text-white shrink-0" />
+                        <span>PhonePe ऐप में खोलें (Pay ₹{amount})</span>
+                      </a>
                       <a
                         href={getCleanUpiUrl()}
                         className="px-4 py-3 rounded-xl bg-purple-100 hover:bg-purple-200 text-purple-950 font-black text-xs border border-purple-300 flex items-center space-x-1 transition-all"
                       >
-                        <span>Direct Universal UPI Link</span>
+                        <span>अन्य UPI ऐप (UPI Intent)</span>
                       </a>
                     </div>
                     <p className="text-[10px] text-purple-900 font-semibold italic bg-purple-100/60 p-2 rounded-lg border border-purple-200">
-                      💡 नोट: यदि आप कंप्यूटर पर हैं, तो अपने मोबाइल फोन के PhonePe ऐप से ऊपर प्रदर्शित QR Code को सीधे स्कैन करें।
+                      💡 <strong>मोबाइल ब्राउज़र नोट:</strong> यदि ब्राउज़र सीधे ऐप नहीं खोलता है, तो "अन्य UPI ऐप" बटन दबाएं अथवा ऊपर दिए गए QR कोड को PhonePe स्कैनर से स्कैन करें।
                     </p>
                   </div>
                 )}
