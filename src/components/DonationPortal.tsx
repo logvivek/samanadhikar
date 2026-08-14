@@ -93,7 +93,7 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
 
   // Clean NPCI UPI URL for QR Code & Direct Links
   const getCleanUpiUrl = (noteOverride?: string) => {
-    const params = getNpciParams(noteOverride, true, "QR");
+    const params = getNpciParams(noteOverride, false, "QR");
     return `upi://pay?${params}`;
   };
 
@@ -104,12 +104,13 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
     const isIos = /iphone|ipad|ipod/i.test(userAgent);
 
     const prefixMap = { phonepe: "PPE", paytm: "PTM", gpay: "GPY", upi: "UPI" };
-    const params = getNpciParams(noteOverride, true, prefixMap[app] || "SAP");
+    const params = getNpciParams(noteOverride, false, prefixMap[app] || "SAP");
     const universalUrl = `upi://pay?${params}`;
 
     if (app === "phonepe") {
       if (isAndroid) {
-        return `intent://pay?${params}#Intent;scheme=upi;package=com.phonepe.app;end`;
+        // Direct PhonePe package intent on Android Chrome
+        return `intent://pay?${params}#Intent;scheme=upi;package=com.phonepe.app;S.browser_fallback_url=${encodeURIComponent(universalUrl)};end`;
       } else if (isIos) {
         return `phonepe://pay?${params}`;
       }
@@ -118,7 +119,7 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
 
     if (app === "paytm") {
       if (isAndroid) {
-        return `intent://pay?${params}#Intent;scheme=upi;package=net.one97.paytm;end`;
+        return `intent://pay?${params}#Intent;scheme=upi;package=net.one97.paytm;S.browser_fallback_url=${encodeURIComponent(universalUrl)};end`;
       } else if (isIos) {
         return `paytmmp://pay?${params}`;
       }
@@ -127,7 +128,7 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
 
     if (app === "gpay") {
       if (isAndroid) {
-        return `intent://pay?${params}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`;
+        return `intent://pay?${params}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;S.browser_fallback_url=${encodeURIComponent(universalUrl)};end`;
       } else if (isIos) {
         return `gpay://upi/pay?${params}`;
       }
@@ -137,15 +138,37 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
     return universalUrl;
   };
 
-  const launchPaymentApp = (app: "phonepe" | "paytm" | "gpay" | "upi", noteOverride?: string) => {
-    const targetUrl = getAppIntentUrl(app, noteOverride);
-    const universalUrl = `upi://pay?${getNpciParams(noteOverride, true, "UPI")}`;
+  const [browserNotice, setBrowserNotice] = useState<string | null>(null);
 
+  const launchPaymentApp = (app: "phonepe" | "paytm" | "gpay" | "upi", noteOverride?: string) => {
+    const params = getNpciParams(noteOverride, false, app.toUpperCase());
+    const universalUrl = `upi://pay?${params}`;
+    const targetUrl = getAppIntentUrl(app, noteOverride);
+
+    // Direct browser navigation via hidden anchor or window location
     try {
-      window.location.href = targetUrl;
+      const a = document.createElement("a");
+      a.href = targetUrl;
+      a.rel = "noopener noreferrer";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     } catch (e) {
-      window.location.href = universalUrl;
+      window.location.href = targetUrl;
     }
+
+    // Secondary fallback after brief interval if custom intent is blocked by browser sandbox
+    setTimeout(() => {
+      try {
+        const fallbackA = document.createElement("a");
+        fallbackA.href = universalUrl;
+        document.body.appendChild(fallbackA);
+        fallbackA.click();
+        document.body.removeChild(fallbackA);
+      } catch (err) {
+        // ignore
+      }
+    }, 600);
   };
 
   const getStandardUpiUrl = (noteOverride?: string) => {
@@ -704,6 +727,19 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
                   <span>समान अधिकार पार्टी - अधिकृत UPI ID: <span className="font-mono text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-300">{officialUpiId}</span></span>
                 </div>
 
+                {browserNotice && (
+                  <div className="p-3 bg-amber-100 border border-amber-300 text-amber-950 rounded-xl text-xs font-bold flex items-center justify-between gap-2">
+                    <span>{browserNotice}</span>
+                    <button 
+                      type="button" 
+                      onClick={() => setBrowserNotice(null)} 
+                      className="px-2 py-1 bg-amber-200 hover:bg-amber-300 rounded font-black text-[10px] cursor-pointer"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+
                 {paymentMethod === "phonepe" && (
                   <div className="p-4 bg-purple-50 border border-purple-300 rounded-2xl space-y-3">
                     <div className="flex items-center justify-between text-purple-950 font-black text-sm">
@@ -717,26 +753,30 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
                       ब्राउज़र से सीधे फोनपे ऐप खोलने के लिए नीचे दिए गए बटन पर क्लिक करें। यदि आपके मोबाइल में PhonePe स्थापित है तो ऐप स्वतः खुल जाएगा।
                     </p>
                     <div className="flex flex-wrap items-center gap-2 pt-1">
-                      <a
-                        href={getAppIntentUrl("phonepe")}
+                      <button
+                        type="button"
                         onClick={(e) => {
-                          // Allow native link navigation, with fallback handler
+                          e.preventDefault();
                           launchPaymentApp("phonepe");
                         }}
                         className="px-5 py-3 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-black text-xs shadow-md flex items-center space-x-2 cursor-pointer hover:scale-105 active:scale-95 transition-all text-center"
                       >
                         <Smartphone className="w-4 h-4 text-white shrink-0" />
                         <span>PhonePe ऐप में खोलें (Pay ₹{amount})</span>
-                      </a>
-                      <a
-                        href={getCleanUpiUrl()}
-                        className="px-4 py-3 rounded-xl bg-purple-100 hover:bg-purple-200 text-purple-950 font-black text-xs border border-purple-300 flex items-center space-x-1 transition-all"
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          launchPaymentApp("upi");
+                        }}
+                        className="px-4 py-3 rounded-xl bg-purple-100 hover:bg-purple-200 text-purple-950 font-black text-xs border border-purple-300 flex items-center space-x-1 transition-all cursor-pointer"
                       >
-                        <span>अन्य UPI ऐप (UPI Intent)</span>
-                      </a>
+                        <span>सभी UPI ऐप्स (Universal Intent)</span>
+                      </button>
                     </div>
                     <p className="text-[10px] text-purple-900 font-semibold italic bg-purple-100/60 p-2 rounded-lg border border-purple-200">
-                      💡 <strong>मोबाइल ब्राउज़र नोट:</strong> यदि ब्राउज़र सीधे ऐप नहीं खोलता है, तो "अन्य UPI ऐप" बटन दबाएं अथवा ऊपर दिए गए QR कोड को PhonePe स्कैनर से स्कैन करें।
+                      💡 <strong>ब्राउज़र नोट:</strong> यदि आपके ब्राउज़र में सीधे ऐप नहीं खुलता है, तो ऊपर दिए गए अधिकृत QR कोड को अपने मोबाइल फोन के PhonePe ऐप से स्कैन करें।
                     </p>
                   </div>
                 )}

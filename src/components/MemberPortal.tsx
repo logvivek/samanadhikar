@@ -107,7 +107,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
 
     if (app === "phonepe") {
       if (isAndroid) {
-        return `intent://pay?${params}#Intent;scheme=upi;package=com.phonepe.app;end`;
+        return `intent://pay?${params}#Intent;scheme=upi;package=com.phonepe.app;S.browser_fallback_url=${encodeURIComponent(universalUrl)};end`;
       } else if (isIos) {
         return `phonepe://pay?${params}`;
       }
@@ -116,7 +116,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
 
     if (app === "paytm") {
       if (isAndroid) {
-        return `intent://pay?${params}#Intent;scheme=upi;package=net.one97.paytm;end`;
+        return `intent://pay?${params}#Intent;scheme=upi;package=net.one97.paytm;S.browser_fallback_url=${encodeURIComponent(universalUrl)};end`;
       } else if (isIos) {
         return `paytmmp://pay?${params}`;
       }
@@ -125,7 +125,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
 
     if (app === "gpay") {
       if (isAndroid) {
-        return `intent://pay?${params}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`;
+        return `intent://pay?${params}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;S.browser_fallback_url=${encodeURIComponent(universalUrl)};end`;
       } else if (isIos) {
         return `gpay://upi/pay?${params}`;
       }
@@ -135,15 +135,35 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
     return universalUrl;
   };
 
+  const [memberBrowserNotice, setMemberBrowserNotice] = useState<string | null>(null);
+
   const launchMemberPaymentApp = (app: "phonepe" | "paytm" | "gpay" | "upi", noteOverride?: string) => {
+    const params = getNpciMemberParams(noteOverride, "MUPI");
+    const universalUrl = `upi://pay?${params}`;
     const targetUrl = getMemberAppIntentUrl(app, noteOverride);
-    const universalUrl = `upi://pay?${getNpciMemberParams(noteOverride, "MUPI")}`;
 
     try {
-      window.location.href = targetUrl;
+      const a = document.createElement("a");
+      a.href = targetUrl;
+      a.rel = "noopener noreferrer";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     } catch (e) {
-      window.location.href = universalUrl;
+      window.location.href = targetUrl;
     }
+
+    setTimeout(() => {
+      try {
+        const fallbackA = document.createElement("a");
+        fallbackA.href = universalUrl;
+        document.body.appendChild(fallbackA);
+        fallbackA.click();
+        document.body.removeChild(fallbackA);
+      } catch (err) {
+        // ignore
+      }
+    }, 600);
   };
 
   const getUpiPaymentUrl = (app: "phonepe" | "paytm" | "gpay" | "upi") => {
@@ -504,29 +524,47 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
                   {/* Payment Details Container */}
                   <div className="p-4 bg-orange-50/80 border border-orange-200 rounded-2xl space-y-4">
                     
+                    {memberBrowserNotice && (
+                      <div className="p-3 bg-amber-100 border border-amber-300 text-amber-950 rounded-xl text-xs font-bold flex items-center justify-between gap-2">
+                        <span>{memberBrowserNotice}</span>
+                        <button 
+                          type="button" 
+                          onClick={() => setMemberBrowserNotice(null)} 
+                          className="px-2 py-1 bg-amber-200 hover:bg-amber-300 rounded font-black text-[10px] cursor-pointer"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    )}
+
                     {paymentApp === "phonepe" && (
                       <div className="p-3 bg-purple-50 border border-purple-200 rounded-xl space-y-2">
                         <div className="font-black text-purple-950 text-xs">PhonePe Gateway (Direct VPA Transfer):</div>
                         <div className="flex flex-wrap items-center gap-2">
-                          <a
-                            href={getMemberAppIntentUrl("phonepe")}
-                            onClick={() => {
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
                               launchMemberPaymentApp("phonepe");
                             }}
-                            className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-black text-xs shadow cursor-pointer hover:scale-105 transition-all"
+                            className="inline-flex items-center space-x-1.5 px-4 py-2.5 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-black text-xs shadow cursor-pointer hover:scale-105 transition-all active:scale-95"
                           >
                             <Smartphone className="w-4 h-4 text-white" />
-                            <span>PhonePe ऐप खोलें (Pay ₹{membershipFee})</span>
-                          </a>
-                          <a
-                            href={getCleanUpiPaymentUrl()}
-                            className="px-3 py-2 rounded-xl bg-purple-100 hover:bg-purple-200 text-purple-950 font-black text-xs border border-purple-300"
+                            <span>PhonePe ऐप में खोलें (Pay ₹{membershipFee})</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              launchMemberPaymentApp("upi");
+                            }}
+                            className="px-3 py-2.5 rounded-xl bg-purple-100 hover:bg-purple-200 text-purple-950 font-black text-xs border border-purple-300 cursor-pointer"
                           >
-                            Direct Link (PhonePe / UPI)
-                          </a>
+                            सभी UPI ऐप्स (Universal Intent)
+                          </button>
                         </div>
                         <p className="text-[10px] text-purple-900 font-medium italic">
-                          💡 Note: If on desktop, scan the SBI QR Code below directly with your phone's PhonePe app.
+                          💡 <strong>ब्राउज़र नोट:</strong> यदि आपके ब्राउज़र में सीधे ऐप नहीं खुलता है, तो नीचे दिए गए SBI QR कोड को PhonePe स्कैनर से स्कैन करें।
                         </p>
                       </div>
                     )}
