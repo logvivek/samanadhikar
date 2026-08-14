@@ -67,6 +67,14 @@ export interface DonationRecord {
   timestamp: string;
   isAnonymous: boolean;
   message?: string;
+  panNumber?: string;
+  citizenship?: "INDIAN" | "NRI";
+  phone?: string;
+  email?: string;
+  address?: string;
+  state?: string;
+  pinCode?: string;
+  passportNumber?: string;
 }
 
 export interface DonationReceipt {
@@ -81,6 +89,15 @@ export interface DonationReceipt {
   paymentStatus?: "SUCCESS" | "FAILED" | "PENDING";
   paymentMethod?: string;
   paymentRef?: string;
+  panNumber?: string;
+  donorEmail?: string;
+  donorPhone?: string;
+  donorAddress?: string;
+  donorState?: string;
+  citizenship?: "INDIAN" | "NRI";
+  passportNumber?: string;
+  partyPan?: string;
+  partyRegNumber?: string;
   bankDetails?: {
     accountNo: string;
     ifsc: string;

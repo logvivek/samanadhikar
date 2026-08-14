@@ -17,6 +17,14 @@ export interface DonationRecord {
   timestamp: string;
   isAnonymous: boolean;
   message?: string;
+  panNumber?: string;
+  citizenship?: "INDIAN" | "NRI";
+  phone?: string;
+  email?: string;
+  address?: string;
+  state?: string;
+  pinCode?: string;
+  passportNumber?: string;
 }
 
 export interface MemberRecord {

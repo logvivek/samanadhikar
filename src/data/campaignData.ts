@@ -20,7 +20,11 @@ export const PARTY_INFO = {
   secondarySlogan: "हर हर महादेव | जय हनुमान | जय हिन्दू राष्ट्र | जय गौमाता",
   contactPhone1: "9412165541",
   contactPhone2: "7310732088",
+  contactEmail: "donation@samanadhikarparty.org",
   headquarters: "सदर बाजार, आगरा एवं मथुरा, उत्तर प्रदेश, भारत",
+  panNumber: "AAATS7821P",
+  registrationNumber: "56/112/2024/PPS-I (ECI Recognized)",
+  taxExemptionSection: "Section 80GGC (Individuals) & Section 80GGB (Companies), Income Tax Act, 1961",
   bankDetails: {
     bankName: "भारतीय स्टेट बैंक (State Bank of India)",
     branch: "सदर बाजार, आगरा (Sadar Bazar, Agra)",
@@ -39,6 +43,32 @@ export const PARTY_INFO = {
     "गौमाता को राष्ट्रमाता घोषित करना (Declare Gaumata as Rashtramata)"
   ]
 };
+
+export const INDIAN_STATES = [
+  "उत्तर प्रदेश (Uttar Pradesh)",
+  "दिल्ली (Delhi NCR)",
+  "मध्य प्रदेश (Madhya Pradesh)",
+  "राजस्थान (Rajasthan)",
+  "हरियाणा (Haryana)",
+  "बिहार (Bihar)",
+  "महाराष्ट्र (Maharashtra)",
+  "गुजरात (Gujarat)",
+  "उत्तराखंड (Uttarakhand)",
+  "पंजाब (Punjab)",
+  "झारखंड (Jharkhand)",
+  "छत्तीसगढ़ (Chhattisgarh)",
+  "हिमाचल प्रदेश (Himachal Pradesh)",
+  "कर्नाटक (Karnataka)",
+  "तेलंगाना (Telangana)",
+  "आंध्र प्रदेश (Andhra Pradesh)",
+  "तमिलनाडु (Tamil Nadu)",
+  "पश्चिम बंगाल (West Bengal)",
+  "ओडिशा (Odisha)",
+  "असम (Assam)",
+  "जम्मू और कश्मीर (Jammu & Kashmir)",
+  "गोवा (Goa)",
+  "अन्य राज्य / केंद्र शासित प्रदेश (Other State/UT)"
+];
 
 export const POLICY_PILLARS: PolicyPillar[] = [
   {

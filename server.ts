@@ -607,7 +607,25 @@ Respond primarily in Hindi in a friendly and informative manner. Use clear bulle
   });
 
   app.post("/api/donations", async (req, res) => {
-    const { donorName, amount, frequency, precinct, isAnonymous, message, paymentMethod, utrNumber, isPaymentCompleted } = req.body;
+    const { 
+      donorName, 
+      amount, 
+      frequency, 
+      precinct, 
+      isAnonymous, 
+      message, 
+      paymentMethod, 
+      utrNumber, 
+      isPaymentCompleted,
+      citizenship,
+      panNumber,
+      phone,
+      email,
+      address,
+      state,
+      pinCode,
+      passportNumber
+    } = req.body;
 
     if (!amount || amount <= 0) {
       return res.status(400).json({ error: "कृपया मान्य दान राशि दर्ज करें।" });
@@ -623,17 +641,19 @@ Respond primarily in Hindi in a friendly and informative manner. Use clear bulle
       const cleanUtr = String(utrNumber).trim().replace(/\s+/g, "").toUpperCase();
       // Must be 12-digit numeric or 10-24 alphanumeric with digits
       const is12DigitUpi = /^\d{12}$/.test(cleanUtr);
-      const isAlphaNumTxn = /^[A-Z0-9]{10,24}$/.test(cleanUtr) && /\d/.test(cleanUtr);
+      const isAlphaNumTxn = /^[A-Z0-9]{8,32}$/.test(cleanUtr);
 
       if (!is12DigitUpi && !isAlphaNumTxn) {
         return res.status(400).json({ 
-          error: "अमान्य UTR / ट्रांजैक्शन ID दर्ज किया गया है। कृपया PhonePe/Paytm/GPay रसीद से 12-अंकीय UTR (RRN) या ट्रांजैक्शन ID (उदा. 420192847120) दर्ज करें।" 
+          error: "अमान्य UTR / ट्रांजैक्शन ID दर्ज किया गया है। कृपया PhonePe/Paytm/GPay/बैंक रसीद से 12-अंकीय UTR (RRN) या ट्रांजैक्शन ID दर्ज करें।" 
         });
       }
       finalUtr = cleanUtr;
     } else {
-      finalUtr = `UTR${Date.now().toString().slice(-8)}${Math.floor(100 + Math.random() * 900)}`;
+      finalUtr = `TXN${Date.now().toString().slice(-8)}${Math.floor(100 + Math.random() * 900)}`;
     }
+
+    const cleanPan = panNumber ? String(panNumber).trim().toUpperCase() : undefined;
 
     const newDonation: DonationRecord = {
       id: `DON-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -643,7 +663,15 @@ Respond primarily in Hindi in a friendly and informative manner. Use clear bulle
       precinct: precinct || "आगरा HQ",
       timestamp: new Date().toISOString(),
       isAnonymous: Boolean(isAnonymous),
-      message: message || ""
+      message: message || "",
+      panNumber: cleanPan,
+      citizenship: citizenship || "INDIAN",
+      phone: phone || undefined,
+      email: email || undefined,
+      address: address || undefined,
+      state: state || undefined,
+      pinCode: pinCode || undefined,
+      passportNumber: passportNumber || undefined
     };
 
     await addDonationDb(newDonation);
@@ -663,10 +691,19 @@ Respond primarily in Hindi in a friendly and informative manner. Use clear bulle
         minute: "2-digit"
       }),
       organization: "समान अधिकार पार्टी (SAMAN ADHIKAR PARTY)",
-      fecTaxNotice: "समान अधिकार पार्टी को दिया गया आपका आर्थिक सहयोग राष्ट्र निर्माण एवं संगठनात्मक कार्य हेतु प्रयुक्त होगा।",
+      fecTaxNotice: "100% Tax Deduction Eligible under Section 80GGC (Individuals) / Section 80GGB (Companies) of the Income Tax Act, 1961.",
       paymentStatus: "SUCCESS" as const,
-      paymentMethod: paymentMethod || "UPI / GPay / PhonePe / SBI Bank Transfer",
+      paymentMethod: paymentMethod || "UPI / GPay / PhonePe / Card / NetBanking",
       paymentRef: finalUtr,
+      panNumber: cleanPan,
+      donorEmail: email,
+      donorPhone: phone,
+      donorAddress: address,
+      donorState: state,
+      citizenship: citizenship || "INDIAN",
+      passportNumber: passportNumber,
+      partyPan: "AAATS7821P",
+      partyRegNumber: "56/112/2024/PPS-I (ECI Recognized)",
       bankDetails: {
         accountNo: partyInfo.bankDetails.accountNo,
         ifsc: partyInfo.bankDetails.ifscCode,
