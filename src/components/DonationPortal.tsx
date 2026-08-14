@@ -1416,7 +1416,7 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
                   केंद्रीय कार्यालय: सदर बाजार, आगरा एवं मथुरा मंडल, उत्तर प्रदेश | दूरभाष: 9412165541, 7310732088
                 </p>
                 <div className="flex flex-wrap items-center justify-center gap-3 text-[11px] font-mono font-bold text-slate-700 pt-1">
-                  <span>पार्टी PAN: <strong className="text-slate-950">{generatedReceipt.partyPan || "AAATS7821P"}</strong></span>
+                  <span>पार्टी PAN: <strong className="text-slate-950">{generatedReceipt.partyPan || PARTY_INFO.panNumber || "AAOAS8885L"}</strong></span>
                   <span>•</span>
                   <span>पंजीकरण संख्या: <strong>56/112/2024/PPS-I</strong></span>
                   <span>•</span>

@@ -22,7 +22,7 @@ export const PARTY_INFO = {
   contactPhone2: "7310732088",
   contactEmail: "donation@samanadhikarparty.org",
   headquarters: "सदर बाजार, आगरा एवं मथुरा, उत्तर प्रदेश, भारत",
-  panNumber: "AAATS7821P",
+  panNumber: "AAOAS8885L",
   registrationNumber: "56/112/2024/PPS-I (ECI Recognized)",
   taxExemptionSection: "Section 80GGC (Individuals) & Section 80GGB (Companies), Income Tax Act, 1961",
   bankDetails: {

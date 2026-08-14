@@ -153,13 +153,25 @@ export async function getDb(): Promise<Database> {
     );
   }
 
-  // Seed default party info if table is empty
-  const partyInfoRes = dbInstance.exec("SELECT COUNT(*) as count FROM party_info");
-  if (!partyInfoRes[0] || partyInfoRes[0].values[0][0] === 0) {
+  // Seed default party info if table is empty or sync updated fields
+  const partyInfoRes = dbInstance.exec("SELECT data FROM party_info ORDER BY id DESC LIMIT 1");
+  if (!partyInfoRes[0] || partyInfoRes[0].values.length === 0) {
     dbInstance.run(
       "INSERT INTO party_info (data, updated_at) VALUES (?, ?)",
       [JSON.stringify(PARTY_INFO), new Date().toISOString()]
     );
+  } else {
+    try {
+      const current = JSON.parse(String(partyInfoRes[0].values[0][0]));
+      if (current.panNumber !== PARTY_INFO.panNumber) {
+        current.panNumber = PARTY_INFO.panNumber;
+        dbInstance.run("DELETE FROM party_info");
+        dbInstance.run(
+          "INSERT INTO party_info (data, updated_at) VALUES (?, ?)",
+          [JSON.stringify(current), new Date().toISOString()]
+        );
+      }
+    } catch {}
   }
 
   // Seed default press releases if table is empty
