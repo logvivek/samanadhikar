@@ -24,7 +24,11 @@ import {
   LogOut,
   Megaphone,
   Globe,
-  Clock
+  Clock,
+  Archive,
+  RotateCcw,
+  Database,
+  Inbox
 } from "lucide-react";
 import { PressRelease } from "../types";
 
@@ -84,9 +88,15 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
   // Data lists
   const [pressReleases, setPressReleases] = useState<PressRelease[]>([]);
+  const [archivedPressReleases, setArchivedPressReleases] = useState<PressRelease[]>([]);
+  const [activePrSubTab, setActivePrSubTab] = useState<"active" | "archive">("active");
+
   const [members, setMembers] = useState<any[]>([]);
   const [donations, setDonations] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
+  const [archivedEvents, setArchivedEvents] = useState<any[]>([]);
+  const [activeEvtSubTab, setActiveEvtSubTab] = useState<"active" | "archive">("active");
+
   const [totalRaised, setTotalRaised] = useState<number>(0);
   const [isLoadingData, setIsLoadingData] = useState<boolean>(false);
 
@@ -111,6 +121,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [newEventLocation, setNewEventLocation] = useState("कोठी मीना बाज़ार मैदान, आगरा");
   const [newEventSpeakers, setNewEventSpeakers] = useState("कुलदीप शर्मा (राष्ट्रीय अध्यक्ष)");
   const [newEventDescription, setNewEventDescription] = useState("");
+  const [newEventImageUrl, setNewEventImageUrl] = useState("");
 
   const formatTimeToHindi = (time24: string) => {
     if (!time24) return "";
@@ -157,6 +168,44 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
   // New Agenda Item input
   const [newAgendaInput, setNewAgendaInput] = useState("");
+  const [isUploadingImage, setIsUploadingImage] = useState<boolean>(false);
+  const [uploadTarget, setUploadTarget] = useState<"pr" | "event">("pr");
+
+  const handleFileUpload = async (file: File, target: "pr" | "event" = "pr") => {
+    if (!file) return;
+    setIsUploadingImage(true);
+    setUploadTarget(target);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const currentToken = adminToken || localStorage.getItem("sap_admin_token") || "";
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${currentToken}`,
+          "X-Admin-Token": currentToken
+        },
+        body: formData
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success && data.url) {
+        if (target === "pr") {
+          setNewPrImageUrl(data.url);
+        } else {
+          setNewEventImageUrl(data.url);
+        }
+        showNotification("फोटो स्टोरेज में सफलतापूर्वक अपलोड हो गई!", "success");
+      } else {
+        showNotification(data.error || "फोटो अपलोड करने में त्रुटि।", "error");
+      }
+    } catch (err) {
+      showNotification("फोटो अपलोड करने में नेटवर्क त्रुटि।", "error");
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
 
   // Member search input
   const [memberSearchQuery, setMemberSearchQuery] = useState("");
@@ -211,15 +260,20 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       const currentToken = adminToken || localStorage.getItem("sap_admin_token") || "";
       const headers: Record<string, string> = currentToken ? { "X-Admin-Token": currentToken } : {};
 
-      const [prRes, memRes, donRes, evtRes] = await Promise.all([
+      const [prRes, prArchRes, memRes, donRes, evtRes, evtArchRes] = await Promise.all([
         fetch("/api/press-releases"),
+        fetch("/api/press-releases/archive"),
         fetch("/api/members", { headers }),
         fetch("/api/donations", { headers }),
-        fetch("/api/events")
+        fetch("/api/events"),
+        fetch("/api/events/archive")
       ]);
 
       const prData = await prRes.json();
       if (prData.pressReleases) setPressReleases(prData.pressReleases);
+
+      const prArchData = await prArchRes.json();
+      if (prArchData.archivedPressReleases) setArchivedPressReleases(prArchData.archivedPressReleases);
 
       const memData = await memRes.json();
       if (memData.members) setMembers(memData.members);
@@ -232,6 +286,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
       const evtData = await evtRes.json();
       if (evtData.events) setEvents(evtData.events);
+
+      const evtArchData = await evtArchRes.json();
+      if (evtArchData.archivedEvents) setArchivedEvents(evtArchData.archivedEvents);
     } catch (err) {
       console.error(err);
     } finally {
@@ -419,9 +476,49 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     }
   };
 
+  // Handle Archive Press Release
+  const handleArchivePressRelease = async (id: string) => {
+    try {
+      const res = await fetch(`/api/press-releases/archive/${id}`, {
+        method: "POST",
+        headers: { "X-Admin-Token": adminToken }
+      });
+      const data = await res.json();
+      if (data.success) {
+        showNotification("प्रेस विज्ञप्ति अभिलेखागार (Archive) में सुरक्षित कर दी गई।", "success");
+        fetchAllData();
+        if (onRefreshData) onRefreshData();
+      } else {
+        showNotification(data.error || "अभिलेखागार में भेजने में विफल।", "error");
+      }
+    } catch (err) {
+      showNotification("अभिलेखागार में भेजने में त्रुटि।", "error");
+    }
+  };
+
+  // Handle Restore Press Release from Archive
+  const handleRestorePressRelease = async (id: string) => {
+    try {
+      const res = await fetch(`/api/press-releases/restore/${id}`, {
+        method: "POST",
+        headers: { "X-Admin-Token": adminToken }
+      });
+      const data = await res.json();
+      if (data.success) {
+        showNotification("प्रेस विज्ञप्ति सक्रिय सूची में पुनर्स्थापित हो गई।", "success");
+        fetchAllData();
+        if (onRefreshData) onRefreshData();
+      } else {
+        showNotification(data.error || "पुनर्स्थापित करने में विफल।", "error");
+      }
+    } catch (err) {
+      showNotification("पुनर्स्थापित करने में त्रुटि।", "error");
+    }
+  };
+
   // Handle Delete Press Release
   const handleDeletePressRelease = async (id: string) => {
-    if (!window.confirm("क्या आप इस प्रेस विज्ञप्ति को हटाना चाहते हैं?")) return;
+    if (!window.confirm("क्या आप इस प्रेस विज्ञप्ति को स्थायी रूप से हटाना चाहते हैं?")) return;
 
     try {
       const res = await fetch(`/api/press-releases/${id}`, {
@@ -470,6 +567,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           locationName: newEventLocation,
           address: newEventLocation,
           cityState: "उत्तर प्रदेश",
+          imageUrl: newEventImageUrl || undefined,
           description: newEventDescription || "समान अधिकार पार्टी का विशाल जन-समारोह।",
           featuredSpeakers: newEventSpeakers.split(",").map(s => s.trim()).filter(Boolean)
         })
@@ -487,6 +585,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           category: newEventCategory,
           date: newEventDate,
           location: newEventLocation,
+          imageUrl: newEventImageUrl || undefined,
           spokesperson: newEventSpeakers || "कुलदीप शर्मा (राष्ट्रीय अध्यक्ष)",
           content: `${newEventTitle} - दिनांक: ${newEventDate}, समय: ${newEventTime}, स्थान: ${newEventLocation}। ${newEventDescription || 'समान अधिकार पार्टी का विशाल आयोजन।'}`,
           isUrgent: true
@@ -498,6 +597,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         showNotification(`नया ${newEventCategory === "Rally" ? "रैली" : "कार्यक्रम"} सफलतापूर्वक जोड़ा व प्रेस विज्ञप्ति अनुभाग में प्रकाशित हुआ!`, "success");
         setNewEventTitle("");
         setNewEventDescription("");
+        setNewEventImageUrl("");
         fetchAllData();
         if (onRefreshData) onRefreshData();
       }
@@ -506,9 +606,49 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     }
   };
 
+  // Handle Archive Event
+  const handleArchiveEvent = async (id: string) => {
+    try {
+      const res = await fetch(`/api/events/archive/${id}`, {
+        method: "POST",
+        headers: { "X-Admin-Token": adminToken }
+      });
+      const data = await res.json();
+      if (data.success) {
+        showNotification("कार्यक्रम/रैली अभिलेखागार (Archive) में सुरक्षित कर दिया गया।", "success");
+        fetchAllData();
+        if (onRefreshData) onRefreshData();
+      } else {
+        showNotification(data.error || "अभिलेखागार में भेजने में विफल।", "error");
+      }
+    } catch (err) {
+      showNotification("अभिलेखागार में भेजने में त्रुटि।", "error");
+    }
+  };
+
+  // Handle Restore Event from Archive
+  const handleRestoreEvent = async (id: string) => {
+    try {
+      const res = await fetch(`/api/events/restore/${id}`, {
+        method: "POST",
+        headers: { "X-Admin-Token": adminToken }
+      });
+      const data = await res.json();
+      if (data.success) {
+        showNotification("कार्यक्रम/रैली सक्रिय सूची में पुनर्स्थापित हो गई।", "success");
+        fetchAllData();
+        if (onRefreshData) onRefreshData();
+      } else {
+        showNotification(data.error || "पुनर्स्थापित करने में विफल।", "error");
+      }
+    } catch (err) {
+      showNotification("पुनर्स्थापित करने में त्रुटि।", "error");
+    }
+  };
+
   // Handle Delete Event
   const handleDeleteEvent = async (id: string) => {
-    if (!window.confirm("क्या आप इस कार्यक्रम को हटाना चाहते हैं?")) return;
+    if (!window.confirm("क्या आप इस कार्यक्रम को स्थायी रूप से हटाना चाहते हैं?")) return;
     try {
       const res = await fetch(`/api/events/${id}`, {
         method: "DELETE",
@@ -518,6 +658,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       if (data.success) {
         showNotification("कार्यक्रम हटा दिया गया।", "success");
         fetchAllData();
+        if (onRefreshData) onRefreshData();
       }
     } catch (err) {
       showNotification("कार्यक्रम हटाने में त्रुटि।", "error");
@@ -1267,16 +1408,50 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    मुख्य फोटो URL (Image URL)
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold text-slate-700">
+                      मुख्य फोटो URL (Image URL)
+                    </label>
+                    <label className="cursor-pointer text-[11px] font-bold text-orange-600 hover:text-orange-700 bg-orange-50 px-2 py-0.5 rounded-md border border-orange-200 inline-flex items-center gap-1">
+                      {isUploadingImage && uploadTarget === "pr" ? (
+                        <span>अपलोड हो रहा है...</span>
+                      ) : (
+                        <>
+                          <Plus className="w-3 h-3" />
+                          <span>डिवाइस से फोटो चुनें</span>
+                        </>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        className="hidden"
+                        disabled={isUploadingImage}
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) {
+                            handleFileUpload(e.target.files[0], "pr");
+                          }
+                        }}
+                      />
+                    </label>
+                  </div>
                   <input
                     type="text"
                     value={newPrImageUrl}
                     onChange={(e) => setNewPrImageUrl(e.target.value)}
-                    placeholder="/images/press_briefing.jpg या https://..."
+                    placeholder="/uploads/upload-xxx.jpg या /images/... या https://..."
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-bold"
                   />
+                  {newPrImageUrl && (
+                    <div className="mt-1.5 flex items-center gap-2">
+                      <img
+                        src={newPrImageUrl}
+                        alt="Preview"
+                        className="w-8 h-8 rounded-md object-cover border border-slate-200"
+                        onError={(e) => { (e.target as HTMLElement).style.display = "none"; }}
+                      />
+                      <span className="text-[10px] text-slate-500 truncate max-w-xs">{newPrImageUrl}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -1329,46 +1504,171 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             </form>
           </div>
 
-          {/* Published Press Releases List */}
-          <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-xl border border-orange-100 space-y-4">
-            <h3 className="text-lg font-black text-slate-900">
-              प्रकाशित प्रेस विज्ञप्तियां ({pressReleases.length})
-            </h3>
+          {/* Published Press Releases List with Active & Archive Tabs */}
+          <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-xl border border-orange-100 space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+              <div>
+                <h3 className="text-lg font-black text-slate-900 flex items-center space-x-2">
+                  <FileText className="w-5 h-5 text-orange-600" />
+                  <span>प्रेस विज्ञप्ति डेटाबेस प्रबंधन</span>
+                </h3>
+                <p className="text-xs text-slate-500 font-medium">
+                  डेटाबेस में अधिकतम 100 सक्रिय रिकॉर्ड रखे जाते हैं। 100 से अधिक होने पर पुराने रिकॉर्ड स्वतः अभिलेखागार (Archive) में सुरक्षित हो जाते हैं।
+                </p>
+              </div>
 
-            <div className="space-y-3">
-              {[...pressReleases]
-                .sort((a, b) => (new Date(b.date).getTime() || 0) - (new Date(a.date).getTime() || 0))
-                .map((pr) => (
-                <div
-                  key={pr.id}
-                  className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+              {/* Sub Tabs: Active (X/100) vs Archive (Y) */}
+              <div className="flex items-center space-x-2 bg-slate-100 p-1 rounded-2xl">
+                <button
+                  type="button"
+                  onClick={() => setActivePrSubTab("active")}
+                  className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer ${
+                    activePrSubTab === "active"
+                      ? "bg-white text-orange-600 shadow-xs border border-orange-200"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
                 >
-                  <div className="space-y-1">
-                    <div className="flex items-center space-x-2">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-black bg-orange-100 text-orange-800">
-                        {pr.category}
-                      </span>
-                      <span className="text-xs text-slate-500 font-bold">{pr.date}</span>
-                      {pr.isUrgent && (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-black bg-red-600 text-white">
-                          URGENT
-                        </span>
-                      )}
-                    </div>
-                    <h4 className="text-sm font-black text-slate-900">{pr.title}</h4>
-                    <p className="text-xs text-slate-600 line-clamp-1">{pr.content}</p>
-                  </div>
+                  <Database className="w-3.5 h-3.5" />
+                  <span>सक्रिय विज्ञप्तियां ({pressReleases.length}/100)</span>
+                </button>
 
-                  <button
-                    onClick={() => handleDeletePressRelease(pr.id)}
-                    className="self-start sm:self-center px-3 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold border border-red-200 flex items-center space-x-1 cursor-pointer shrink-0"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>हटाएं</span>
-                  </button>
-                </div>
-              ))}
+                <button
+                  type="button"
+                  onClick={() => setActivePrSubTab("archive")}
+                  className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer ${
+                    activePrSubTab === "archive"
+                      ? "bg-white text-orange-600 shadow-xs border border-orange-200"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  <Archive className="w-3.5 h-3.5" />
+                  <span>अभिलेखागार ({archivedPressReleases.length})</span>
+                </button>
+              </div>
             </div>
+
+            {/* Database storage threshold indicator */}
+            <div className="p-3.5 rounded-2xl bg-orange-50/70 border border-orange-200 flex items-center justify-between text-xs font-bold text-orange-950">
+              <div className="flex items-center space-x-2">
+                <Database className="w-4 h-4 text-orange-600 shrink-0" />
+                <span>
+                  सक्रिय कोटा: <span className="text-orange-700 font-black">{pressReleases.length}</span> / 100 | अभिलेखागार में सुरक्षित: <span className="text-slate-800 font-black">{archivedPressReleases.length}</span>
+                </span>
+              </div>
+              <span className="text-[11px] text-orange-700 bg-white px-2.5 py-1 rounded-lg border border-orange-200 font-bold">
+                Auto-Archive: 100 Limit
+              </span>
+            </div>
+
+            {/* ACTIVE PRESS RELEASES LIST */}
+            {activePrSubTab === "active" && (
+              <div className="space-y-3">
+                {pressReleases.length === 0 ? (
+                  <div className="text-center py-8 text-slate-400 text-xs font-bold bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                    कोई सक्रिय प्रेस विज्ञप्ति नहीं मिली।
+                  </div>
+                ) : (
+                  [...pressReleases]
+                    .sort((a, b) => (new Date(b.date).getTime() || 0) - (new Date(a.date).getTime() || 0))
+                    .map((pr) => (
+                    <div
+                      key={pr.id}
+                      className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:border-orange-200 transition-colors"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center space-x-2">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-black bg-orange-100 text-orange-800">
+                            {pr.category}
+                          </span>
+                          <span className="text-xs text-slate-500 font-bold">{pr.date}</span>
+                          {pr.isUrgent && (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-black bg-red-600 text-white">
+                              URGENT
+                            </span>
+                          )}
+                        </div>
+                        <h4 className="text-sm font-black text-slate-900">{pr.title}</h4>
+                        <p className="text-xs text-slate-600 line-clamp-1">{pr.content}</p>
+                      </div>
+
+                      <div className="flex items-center space-x-2 shrink-0 self-start sm:self-center">
+                        <button
+                          onClick={() => handleArchivePressRelease(pr.id)}
+                          title="अभिलेखागार में सुरक्षित करें"
+                          className="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold border border-amber-200 flex items-center space-x-1 cursor-pointer"
+                        >
+                          <Archive className="w-3.5 h-3.5" />
+                          <span>संग्रहित करें</span>
+                        </button>
+                        <button
+                          onClick={() => handleDeletePressRelease(pr.id)}
+                          title="हटाएं"
+                          className="px-3 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold border border-red-200 flex items-center space-x-1 cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>हटाएं</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* ARCHIVED PRESS RELEASES LIST */}
+            {activePrSubTab === "archive" && (
+              <div className="space-y-3">
+                {archivedPressReleases.length === 0 ? (
+                  <div className="text-center py-8 text-slate-400 text-xs font-bold bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                    अभिलेखागार में कोई विज्ञप्ति नहीं है। (100 सक्रिय विज्ञप्तियों से अधिक होने पर यहाँ स्वतः संग्रहीत होंगी)
+                  </div>
+                ) : (
+                  [...archivedPressReleases]
+                    .sort((a, b) => (new Date(b.date).getTime() || 0) - (new Date(a.date).getTime() || 0))
+                    .map((pr: any) => (
+                    <div
+                      key={pr.id}
+                      className="p-4 rounded-2xl bg-amber-50/40 border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center space-x-2">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-black bg-amber-200 text-amber-900">
+                            अभिलेखागार ({pr.category})
+                          </span>
+                          <span className="text-xs text-slate-500 font-bold">{pr.date}</span>
+                          {pr.archivedAt && (
+                            <span className="text-[10px] text-slate-400 font-medium">
+                              (Archived: {new Date(pr.archivedAt).toLocaleDateString("hi-IN")})
+                            </span>
+                          )}
+                        </div>
+                        <h4 className="text-sm font-black text-slate-800">{pr.title}</h4>
+                        <p className="text-xs text-slate-600 line-clamp-1">{pr.content}</p>
+                      </div>
+
+                      <div className="flex items-center space-x-2 shrink-0 self-start sm:self-center">
+                        <button
+                          onClick={() => handleRestorePressRelease(pr.id)}
+                          title="पुनः सक्रिय सूची में लाएं"
+                          className="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-200 flex items-center space-x-1 cursor-pointer"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          <span>सक्रिय करें</span>
+                        </button>
+                        <button
+                          onClick={() => handleDeletePressRelease(pr.id)}
+                          title="स्थायी रूप से हटाएं"
+                          className="px-3 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold border border-red-200 flex items-center space-x-1 cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>हटाएं</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1510,6 +1810,53 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               </div>
 
               <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-slate-700">
+                    कार्यक्रम फोटो / बैनर URL (Event Image URL)
+                  </label>
+                  <label className="cursor-pointer text-[11px] font-bold text-orange-600 hover:text-orange-700 bg-orange-50 px-2 py-0.5 rounded-md border border-orange-200 inline-flex items-center gap-1">
+                    {isUploadingImage && uploadTarget === "event" ? (
+                      <span>अपलोड हो रहा है...</span>
+                    ) : (
+                      <>
+                        <Plus className="w-3 h-3" />
+                        <span>डिवाइस से फोटो चुनें</span>
+                      </>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      className="hidden"
+                      disabled={isUploadingImage}
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          handleFileUpload(e.target.files[0], "event");
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+                <input
+                  type="text"
+                  value={newEventImageUrl}
+                  onChange={(e) => setNewEventImageUrl(e.target.value)}
+                  placeholder="/uploads/upload-xxx.jpg या /images/... या https://..."
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-bold"
+                />
+                {newEventImageUrl && (
+                  <div className="mt-1.5 flex items-center gap-2">
+                    <img
+                      src={newEventImageUrl}
+                      alt="Preview"
+                      className="w-8 h-8 rounded-md object-cover border border-slate-200"
+                      onError={(e) => { (e.target as HTMLElement).style.display = "none"; }}
+                    />
+                    <span className="text-[10px] text-slate-500 truncate max-w-xs">{newEventImageUrl}</span>
+                  </div>
+                )}
+              </div>
+
+              <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   विवरण (Description)
                 </label>
@@ -1531,32 +1878,166 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             </form>
           </div>
 
-          <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-xl border border-orange-100 space-y-4">
-            <h3 className="text-lg font-black text-slate-900">
-              अनुसूचित कार्यक्रम ({events.length})
-            </h3>
+          {/* Scheduled Events & Rally List with Active & Archive Tabs */}
+          <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-xl border border-orange-100 space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+              <div>
+                <h3 className="text-lg font-black text-slate-900 flex items-center space-x-2">
+                  <Calendar className="w-5 h-5 text-orange-600" />
+                  <span>कार्यक्रम व रैली डेटाबेस प्रबंधन</span>
+                </h3>
+                <p className="text-xs text-slate-500 font-medium">
+                  डेटाबेस में अधिकतम 100 सक्रिय कार्यक्रम व रैली सुरक्षित रखी जाती हैं। 100 से अधिक होने पर पुराने रिकॉर्ड स्वतः अभिलेखागार में सुरक्षित हो जाते हैं।
+                </p>
+              </div>
 
-            <div className="space-y-3">
-              {events.map((evt) => (
-                <div
-                  key={evt.id}
-                  className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+              {/* Sub Tabs: Active (X/100) vs Archive (Y) */}
+              <div className="flex items-center space-x-2 bg-slate-100 p-1 rounded-2xl">
+                <button
+                  type="button"
+                  onClick={() => setActiveEvtSubTab("active")}
+                  className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer ${
+                    activeEvtSubTab === "active"
+                      ? "bg-white text-orange-600 shadow-xs border border-orange-200"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
                 >
-                  <div>
-                    <h4 className="text-sm font-black text-slate-900">{evt.title}</h4>
-                    <p className="text-xs text-orange-700 font-bold">{evt.displayDate} • {evt.time}</p>
-                    <p className="text-xs text-slate-600">{evt.locationName}</p>
-                  </div>
+                  <Database className="w-3.5 h-3.5" />
+                  <span>सक्रिय कार्यक्रम/रैली ({events.length}/100)</span>
+                </button>
 
-                  <button
-                    onClick={() => handleDeleteEvent(evt.id)}
-                    className="px-3 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold border border-red-200 cursor-pointer self-start sm:self-center"
-                  >
-                    हटाएं
-                  </button>
-                </div>
-              ))}
+                <button
+                  type="button"
+                  onClick={() => setActiveEvtSubTab("archive")}
+                  className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer ${
+                    activeEvtSubTab === "archive"
+                      ? "bg-white text-orange-600 shadow-xs border border-orange-200"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  <Archive className="w-3.5 h-3.5" />
+                  <span>अभिलेखागार ({archivedEvents.length})</span>
+                </button>
+              </div>
             </div>
+
+            {/* Database storage threshold indicator */}
+            <div className="p-3.5 rounded-2xl bg-orange-50/70 border border-orange-200 flex items-center justify-between text-xs font-bold text-orange-950">
+              <div className="flex items-center space-x-2">
+                <Database className="w-4 h-4 text-orange-600 shrink-0" />
+                <span>
+                  सक्रिय कोटा: <span className="text-orange-700 font-black">{events.length}</span> / 100 | अभिलेखागार में सुरक्षित: <span className="text-slate-800 font-black">{archivedEvents.length}</span>
+                </span>
+              </div>
+              <span className="text-[11px] text-orange-700 bg-white px-2.5 py-1 rounded-lg border border-orange-200 font-bold">
+                Auto-Archive: 100 Limit
+              </span>
+            </div>
+
+            {/* ACTIVE EVENTS LIST */}
+            {activeEvtSubTab === "active" && (
+              <div className="space-y-3">
+                {events.length === 0 ? (
+                  <div className="text-center py-8 text-slate-400 text-xs font-bold bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                    कोई सक्रिय कार्यक्रम या रैली नहीं मिली।
+                  </div>
+                ) : (
+                  events.map((evt) => (
+                    <div
+                      key={evt.id}
+                      className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:border-orange-200 transition-colors"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center space-x-2">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-black ${
+                            evt.category === "Rally" || evt.type === "Rally"
+                              ? "bg-red-100 text-red-800"
+                              : "bg-orange-100 text-orange-800"
+                          }`}>
+                            {evt.category === "Rally" || evt.type === "Rally" ? "📣 रैली (Rally)" : "🚩 कार्यक्रम (Karyakram)"}
+                          </span>
+                          <span className="text-xs text-orange-700 font-bold">{evt.displayDate || evt.date} • {evt.time}</span>
+                        </div>
+                        <h4 className="text-sm font-black text-slate-900">{evt.title}</h4>
+                        <p className="text-xs text-slate-600">{evt.locationName || evt.address}</p>
+                      </div>
+
+                      <div className="flex items-center space-x-2 shrink-0 self-start sm:self-center">
+                        <button
+                          onClick={() => handleArchiveEvent(evt.id)}
+                          title="अभिलेखागार में सुरक्षित करें"
+                          className="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold border border-amber-200 flex items-center space-x-1 cursor-pointer"
+                        >
+                          <Archive className="w-3.5 h-3.5" />
+                          <span>संग्रहित करें</span>
+                        </button>
+                        <button
+                          onClick={() => handleDeleteEvent(evt.id)}
+                          title="हटाएं"
+                          className="px-3 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold border border-red-200 flex items-center space-x-1 cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>हटाएं</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* ARCHIVED EVENTS LIST */}
+            {activeEvtSubTab === "archive" && (
+              <div className="space-y-3">
+                {archivedEvents.length === 0 ? (
+                  <div className="text-center py-8 text-slate-400 text-xs font-bold bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                    अभिलेखागार में कोई कार्यक्रम/रैली नहीं है। (100 सक्रिय कार्यक्रमों से अधिक होने पर यहाँ स्वतः संग्रहीत होंगी)
+                  </div>
+                ) : (
+                  archivedEvents.map((evt: any) => (
+                    <div
+                      key={evt.id}
+                      className="p-4 rounded-2xl bg-amber-50/40 border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center space-x-2">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-black bg-amber-200 text-amber-900">
+                            अभिलेखागार ({evt.category === "Rally" || evt.type === "Rally" ? "रैली" : "कार्यक्रम"})
+                          </span>
+                          <span className="text-xs text-slate-500 font-bold">{evt.displayDate || evt.date} • {evt.time}</span>
+                          {evt.archivedAt && (
+                            <span className="text-[10px] text-slate-400 font-medium">
+                              (Archived: {new Date(evt.archivedAt).toLocaleDateString("hi-IN")})
+                            </span>
+                          )}
+                        </div>
+                        <h4 className="text-sm font-black text-slate-800">{evt.title}</h4>
+                        <p className="text-xs text-slate-600">{evt.locationName || evt.address}</p>
+                      </div>
+
+                      <div className="flex items-center space-x-2 shrink-0 self-start sm:self-center">
+                        <button
+                          onClick={() => handleRestoreEvent(evt.id)}
+                          title="पुनः सक्रिय सूची में लाएं"
+                          className="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-200 flex items-center space-x-1 cursor-pointer"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          <span>सक्रिय करें</span>
+                        </button>
+                        <button
+                          onClick={() => handleDeleteEvent(evt.id)}
+                          title="स्थायी रूप से हटाएं"
+                          className="px-3 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold border border-red-200 flex items-center space-x-1 cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>हटाएं</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
