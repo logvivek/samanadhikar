@@ -11,10 +11,18 @@ import { AICampaignAssistant } from "./components/AICampaignAssistant";
 import { AdminPortal } from "./components/AdminPortal";
 import { Footer } from "./components/Footer";
 import { CashfreeReturnModal } from "./components/CashfreeReturnModal";
+import { CashfreeGatewayPage } from "./components/CashfreeGatewayPage";
 import { DonationReceipt, DonationRecord, PressRelease } from "./types";
 import { X, QrCode, Users } from "lucide-react";
 
 export default function App() {
+  const [isCashfreeGateway, setIsCashfreeGateway] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    const path = window.location.pathname;
+    const view = new URLSearchParams(window.location.search).get("view");
+    return path === "/cashfree-gateway" || view === "cashfree_gateway";
+  });
+
   const [activeTab, setActiveTab] = useState<string>("platform");
   const [isDonateModalOpen, setIsDonateModalOpen] = useState<boolean>(false);
   const [isMemberModalOpen, setIsMemberModalOpen] = useState<boolean>(false);
@@ -109,6 +117,10 @@ export default function App() {
   const handleDonationSuccess = (receipt: DonationReceipt) => {
     fetchDonationsData();
   };
+
+  if (isCashfreeGateway) {
+    return <CashfreeGatewayPage />;
+  }
 
   return (
     <div className="min-h-screen bg-slate-900/95 2xl:py-2 font-sans text-slate-900 selection:bg-orange-500 selection:text-white flex justify-center items-start">

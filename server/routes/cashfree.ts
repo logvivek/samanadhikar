@@ -74,13 +74,13 @@ cashfreeRouter.get("/order-status/:orderId", async (req, res) => {
 // Direct or fallback order verification
 cashfreeRouter.post("/verify-order", async (req, res) => {
   try {
-    const { orderId, donorData, memberData } = req.body;
+    const { orderId, donorData, memberData, paymentMethod } = req.body;
 
     if (!orderId) {
       return res.status(400).json({ success: false, error: "Order ID आवश्यक है।" });
     }
 
-    const result = await processOrderCompletion(String(orderId), donorData, memberData);
+    const result = await processOrderCompletion(String(orderId), donorData, memberData, paymentMethod);
     if (result.success) {
       return res.json(result);
     }

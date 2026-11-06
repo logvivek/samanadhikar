@@ -245,6 +245,7 @@ describe("Production Server & Security Architecture Tests", () => {
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
       expect(res.body.paymentSessionId).toBeDefined();
+      expect(res.body.paymentUrl).toBeDefined();
       expect(res.body.orderId).toMatch(/^order_sap_\d+_\d+$/);
       expect(res.body.returnUrl).toContain("?order_id={order_id}&payment_status=cashfree_return");
       expect(res.body.apiEndpoint).toBe("https://api.cashfree.com/pg/orders");

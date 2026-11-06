@@ -2,8 +2,8 @@
   "version": 2,
   "adminCredentials": {
     "username": "admin",
-    "passwordHash": "$2b$12$SHjF5ae.0NH824dgJY8dOu1K3VtBLq.vXkYXHGT5gK9pZNai6Ffxy",
-    "updatedAt": "2026-11-06T10:05:05.953Z"
+    "passwordHash": "$2b$12$0hp2V7tqpwAtolfs7YHbQ.L88GASRJdL6/TPtfrL7FEXbXB2zlwja",
+    "updatedAt": "2026-11-06T10:55:10.498Z"
   },
   "partyInfo": {
     "name": "समान अधिकार पार्टी",
@@ -337,14 +337,14 @@
   "archivedEvents": [],
   "donations": [
     {
-      "id": "DON-order_sap_1793959505957_7451",
+      "id": "DON-order_sap_1793962510504_1619",
       "donorName": "राजेश कुमार शर्मा",
       "amount": 1100,
       "frequency": "one-time",
       "precinct": "उत्तर प्रदेश",
-      "timestamp": "2026-11-06T10:05:05.963Z",
+      "timestamp": "2026-11-06T10:55:10.510Z",
       "isAnonymous": false,
-      "message": "Cashfree Web Checkout (order_sap_1793959505957_7451)",
+      "message": "Cashfree Web Checkout (order_sap_1793962510504_1619)",
       "citizenship": "INDIAN",
       "state": "उत्तर प्रदेश"
     },
@@ -354,7 +354,7 @@
       "amount": 5100,
       "frequency": "one-time",
       "precinct": "आगरा सदर",
-      "timestamp": "2026-11-06T08:05:05.953Z",
+      "timestamp": "2026-11-06T08:55:10.498Z",
       "isAnonymous": false,
       "message": "समान अधिकार पार्टी का संकल्प ही देश को मजबूत बनाएगा। आरक्षण मुक्त भारत!"
     },
@@ -364,7 +364,7 @@
       "amount": 1100,
       "frequency": "monthly",
       "precinct": "मथुरा ज़िला",
-      "timestamp": "2026-11-06T04:05:05.953Z",
+      "timestamp": "2026-11-06T04:55:10.498Z",
       "isAnonymous": false,
       "message": "जय श्री कृष्णा! मथुरा मंदिर पुनरोद्धार एवं गौ-संरक्षण हेतु पूर्ण समर्थन।"
     },
@@ -374,7 +374,7 @@
       "amount": 11000,
       "frequency": "one-time",
       "precinct": "दिल्ली NCR",
-      "timestamp": "2026-11-05T20:05:05.953Z",
+      "timestamp": "2026-11-05T20:55:10.498Z",
       "isAnonymous": true,
       "message": "हिंदू राष्ट्र और जनसंख्या नियंत्रण कानून समय की सबसे बड़ी मांग है।"
     },
@@ -384,7 +384,7 @@
       "amount": 2100,
       "frequency": "monthly",
       "precinct": "अलीगढ़",
-      "timestamp": "2026-11-05T14:05:05.953Z",
+      "timestamp": "2026-11-05T14:55:10.498Z",
       "isAnonymous": false,
       "message": "गुरुकुल योजना से हमारे बच्चों को संस्कार और उच्च शिक्षा मिलेगी।"
     }
@@ -393,8 +393,8 @@
   "eventRsvps": [],
   "cashfreeOrders": [
     {
-      "orderId": "order_sap_1793959505957_7451",
-      "paymentSessionId": "session_cf_test_1793959505958_6xjt7pw",
+      "orderId": "order_sap_1793962510504_1619",
+      "paymentSessionId": "session_cf_test_1793962510505_qspw14k",
       "orderAmount": 1100,
       "orderType": "DONATION",
       "orderStatus": "PAID",
@@ -404,21 +404,21 @@
         "donorState": "उत्तर प्रदेश",
         "isAnonymous": false
       },
-      "createdAt": "2026-11-06T10:05:05.958Z",
-      "transactionId": "CF-SIM-59505963",
+      "createdAt": "2026-11-06T10:55:10.505Z",
+      "transactionId": "CF-SIM-62510510",
       "paymentMethod": "Cashfree PG Simulator",
       "receipt": {
-        "receiptNumber": "REC-SAP-505964",
-        "transactionId": "CF-SIM-59505963",
+        "receiptNumber": "REC-SAP-510510",
+        "transactionId": "CF-SIM-62510510",
         "amount": 1100,
         "frequency": "one-time",
         "donorName": "राजेश कुमार शर्मा",
-        "date": "6 नवंबर 2026 को 10:05 am बजे",
+        "date": "6 नवंबर 2026 को 10:55 am बजे",
         "organization": "समान अधिकार पार्टी (SAMAN ADHIKAR PARTY)",
         "fecTaxNotice": "100% Tax Deduction Eligible under Section 80GGC (Individuals) / Section 80GGB (Companies) of the Income Tax Act, 1961.",
         "paymentStatus": "SUCCESS",
         "paymentMethod": "Cashfree PG Simulator",
-        "paymentRef": "CF-SIM-59505963",
+        "paymentRef": "CF-SIM-62510510",
         "donorState": "उत्तर प्रदेश",
         "citizenship": "INDIAN",
         "partyPan": "AAOAS8885L",
@@ -430,7 +430,7 @@
         }
       },
       "memberCard": null,
-      "completedAt": "2026-11-06T10:05:05.964Z"
+      "completedAt": "2026-11-06T10:55:10.511Z"
     }
   ]
 }

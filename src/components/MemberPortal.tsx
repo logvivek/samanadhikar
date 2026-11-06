@@ -392,28 +392,46 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
         return;
       }
 
-      let cashfree: any = null;
-      if (typeof window !== "undefined" && typeof (window as any).Cashfree === "function") {
-        cashfree = (window as any).Cashfree({
-          mode: orderData.mode === "production" ? "production" : "sandbox"
-        });
-      } else {
-        cashfree = await loadCashfree({
-          mode: orderData.mode === "production" ? "production" : "sandbox"
-        });
+      // 2. Perform Web Redirection to Cashfree Payment Gateway Page
+      const targetUrl = orderData.paymentUrl || (
+        orderData.mode === "production"
+          ? `https://payments.cashfree.com/order/#${orderData.paymentSessionId}`
+          : `https://payments-test.cashfree.com/order/#${orderData.paymentSessionId}`
+      );
+
+      // If simulated or paymentUrl provided, immediately redirect browser to payment gateway page
+      if (orderData.isSimulated || orderData.paymentUrl) {
+        window.location.href = targetUrl;
+        return;
       }
 
-      if (cashfree && typeof cashfree.checkout === "function") {
-        cashfree.checkout({
-          paymentSessionId: orderData.paymentSessionId,
-          redirectTarget: "_self" // Standard Web Redirect
-        }).then((result: any) => {
-          if (result && result.error) {
-            setPaymentError(result.error.message || "कैशफ्री चेकआउट में त्रुटि आई।");
-          }
-        }).catch((err: any) => {
-          console.warn("Cashfree checkout error:", err);
-        });
+      // 3. For live Cashfree credentials, trigger Cashfree Web Redirect Checkout
+      try {
+        let cashfree: any = null;
+        if (typeof window !== "undefined" && typeof (window as any).Cashfree === "function") {
+          cashfree = (window as any).Cashfree({
+            mode: orderData.mode === "production" ? "production" : "sandbox"
+          });
+        } else {
+          cashfree = await loadCashfree({
+            mode: orderData.mode === "production" ? "production" : "sandbox"
+          });
+        }
+
+        if (cashfree && typeof cashfree.checkout === "function") {
+          cashfree.checkout({
+            paymentSessionId: orderData.paymentSessionId,
+            redirectTarget: "_self" // Standard Web Redirect
+          }).catch((err: any) => {
+            console.warn("Cashfree checkout error, fallback to direct redirect:", err);
+            window.location.href = targetUrl;
+          });
+        } else {
+          window.location.href = targetUrl;
+        }
+      } catch (sdkErr) {
+        console.warn("Cashfree JS SDK error, redirecting directly:", sdkErr);
+        window.location.href = targetUrl;
       }
     } catch (err) {
       console.error(err);
