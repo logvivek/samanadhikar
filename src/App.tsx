@@ -10,6 +10,7 @@ import { CampaignStats } from "./components/CampaignStats";
 import { AICampaignAssistant } from "./components/AICampaignAssistant";
 import { AdminPortal } from "./components/AdminPortal";
 import { Footer } from "./components/Footer";
+import { CashfreeReturnModal } from "./components/CashfreeReturnModal";
 import { DonationReceipt, DonationRecord, PressRelease } from "./types";
 import { X, QrCode, Users } from "lucide-react";
 
@@ -296,6 +297,11 @@ export default function App() {
           setIsAiModalOpen(false);
           setIsDonateModalOpen(true);
         }}
+      />
+
+      {/* Cashfree Web Redirect Return Handler Modal */}
+      <CashfreeReturnModal
+        onDonationSuccess={handleDonationSuccess}
       />
 
     </div>

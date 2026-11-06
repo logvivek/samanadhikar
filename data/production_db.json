@@ -2,8 +2,8 @@
   "version": 2,
   "adminCredentials": {
     "username": "admin",
-    "passwordHash": "$2b$12$HSmlb149KmE3InIMtcKLAOi/bWQ7Y4bGikfuNcjA/VMh2Jsc4bvke",
-    "updatedAt": "2026-08-30T15:42:49.367Z"
+    "passwordHash": "$2b$12$1p06BvLC/XnLffbY.u0vaeMyGG0LiG8ZlY4/ZVjqX7.71XgPM2J4O",
+    "updatedAt": "2026-11-06T09:51:24.915Z"
   },
   "partyInfo": {
     "name": "समान अधिकार पार्टी",
@@ -337,15 +337,16 @@
   "archivedEvents": [],
   "donations": [
     {
-      "id": "DON-569371",
-      "donorName": "अतुल भारद्वाज",
-      "amount": 5100,
+      "id": "DON-order_sap_1793958684920_5770",
+      "donorName": "राजेश कुमार शर्मा",
+      "amount": 1100,
       "frequency": "one-time",
-      "precinct": "भारत",
-      "timestamp": "2026-08-30T15:42:49.371Z",
+      "precinct": "उत्तर प्रदेश",
+      "timestamp": "2026-11-06T09:51:24.927Z",
       "isAnonymous": false,
-      "panNumber": "ABCDE1234F",
-      "citizenship": "INDIAN"
+      "message": "Cashfree Web Checkout (order_sap_1793958684920_5770)",
+      "citizenship": "INDIAN",
+      "state": "उत्तर प्रदेश"
     },
     {
       "id": "DON-1001",
@@ -353,7 +354,7 @@
       "amount": 5100,
       "frequency": "one-time",
       "precinct": "आगरा सदर",
-      "timestamp": "2026-08-30T13:42:49.367Z",
+      "timestamp": "2026-11-06T07:51:24.915Z",
       "isAnonymous": false,
       "message": "समान अधिकार पार्टी का संकल्प ही देश को मजबूत बनाएगा। आरक्षण मुक्त भारत!"
     },
@@ -363,7 +364,7 @@
       "amount": 1100,
       "frequency": "monthly",
       "precinct": "मथुरा ज़िला",
-      "timestamp": "2026-08-30T09:42:49.367Z",
+      "timestamp": "2026-11-06T03:51:24.915Z",
       "isAnonymous": false,
       "message": "जय श्री कृष्णा! मथुरा मंदिर पुनरोद्धार एवं गौ-संरक्षण हेतु पूर्ण समर्थन।"
     },
@@ -373,7 +374,7 @@
       "amount": 11000,
       "frequency": "one-time",
       "precinct": "दिल्ली NCR",
-      "timestamp": "2026-08-30T01:42:49.367Z",
+      "timestamp": "2026-11-05T19:51:24.915Z",
       "isAnonymous": true,
       "message": "हिंदू राष्ट्र और जनसंख्या नियंत्रण कानून समय की सबसे बड़ी मांग है।"
     },
@@ -383,11 +384,53 @@
       "amount": 2100,
       "frequency": "monthly",
       "precinct": "अलीगढ़",
-      "timestamp": "2026-08-29T19:42:49.367Z",
+      "timestamp": "2026-11-05T13:51:24.915Z",
       "isAnonymous": false,
       "message": "गुरुकुल योजना से हमारे बच्चों को संस्कार और उच्च शिक्षा मिलेगी।"
     }
   ],
   "members": [],
-  "eventRsvps": []
+  "eventRsvps": [],
+  "cashfreeOrders": [
+    {
+      "orderId": "order_sap_1793958684920_5770",
+      "paymentSessionId": "session_cf_test_1793958684920_avg7r5n",
+      "orderAmount": 1100,
+      "orderType": "DONATION",
+      "orderStatus": "PAID",
+      "donorData": {
+        "donorName": "राजेश कुमार शर्मा",
+        "amount": 1100,
+        "donorState": "उत्तर प्रदेश",
+        "isAnonymous": false
+      },
+      "createdAt": "2026-11-06T09:51:24.920Z",
+      "transactionId": "CF-SIM-58684927",
+      "paymentMethod": "Cashfree PG Simulator",
+      "receipt": {
+        "receiptNumber": "REC-SAP-684928",
+        "transactionId": "CF-SIM-58684927",
+        "amount": 1100,
+        "frequency": "one-time",
+        "donorName": "राजेश कुमार शर्मा",
+        "date": "6 नवंबर 2026 को 09:51 am बजे",
+        "organization": "समान अधिकार पार्टी (SAMAN ADHIKAR PARTY)",
+        "fecTaxNotice": "100% Tax Deduction Eligible under Section 80GGC (Individuals) / Section 80GGB (Companies) of the Income Tax Act, 1961.",
+        "paymentStatus": "SUCCESS",
+        "paymentMethod": "Cashfree PG Simulator",
+        "paymentRef": "CF-SIM-58684927",
+        "donorState": "उत्तर प्रदेश",
+        "citizenship": "INDIAN",
+        "partyPan": "AAOAS8885L",
+        "partyRegNumber": "56/112/2024/PPS-I (ECI Recognized)",
+        "bankDetails": {
+          "accountNo": "34465318239",
+          "ifsc": "SBIN0002467",
+          "upiId": "samanadhikarparty@sbi"
+        }
+      },
+      "memberCard": null,
+      "completedAt": "2026-11-06T09:51:24.928Z"
+    }
+  ]
 }

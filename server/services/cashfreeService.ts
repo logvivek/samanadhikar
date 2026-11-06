@@ -1,5 +1,9 @@
 import { CONFIG } from "../config";
-import { DonationRecord, PartyInfo } from "../types";
+import { DonationRecord, MemberRecord, PartyInfo, CashfreeOrderRecord } from "../types";
+import { saveCashfreeOrder, getCashfreeOrder, updateCashfreeOrder } from "../database/repositories/cashfreeRepository";
+import { addDonation, getDonations } from "../database/repositories/donationRepository";
+import { addMember, getMembers } from "../database/repositories/memberRepository";
+import { getPartyInfo } from "../database/repositories/partyRepository";
 
 export interface CreateOrderParams {
   orderAmount: number;
@@ -8,15 +12,27 @@ export interface CreateOrderParams {
   customerEmail?: string;
   orderType?: "DONATION" | "MEMBERSHIP";
   notes?: string;
+  appUrl?: string;
+  donorData?: Partial<DonationRecord>;
+  memberData?: Partial<MemberRecord>;
 }
 
 export async function createCashfreeOrder(params: CreateOrderParams) {
-  const { orderAmount, customerName, customerPhone, customerEmail, orderType, notes } = params;
+  const { orderAmount, customerName, customerPhone, customerEmail, orderType, notes, appUrl, donorData, memberData } = params;
 
   const orderId = `order_sap_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
   const cleanPhone = (customerPhone ? String(customerPhone).replace(/\D/g, "") : "").slice(-10) || "9412165541";
   const cleanName = (customerName && String(customerName).trim().length > 0) ? String(customerName).trim() : "राष्ट्रभक्त नागरिक";
   const cleanEmail = (customerEmail && String(customerEmail).includes("@")) ? String(customerEmail).trim() : "donation@samanadhikarparty.org";
+
+  // Clean absolute Base URL for Cashfree Return URL specification
+  const fallbackBase = process.env.APP_URL || "https://ais-dev-hj4se4pfjscomqdajpxts7-744727416675.asia-southeast1.run.app";
+  const baseUrl = (appUrl && appUrl.startsWith("http")) ? appUrl.replace(/\/$/, "") : fallbackBase.replace(/\/$/, "");
+  
+  // As per https://www.cashfree.com/docs/payments/online/web/redirect:
+  // return_url contains {order_id} placeholder replaced automatically by Cashfree upon redirection
+  const returnUrl = `${baseUrl}/?order_id={order_id}&payment_status=cashfree_return`;
+  const notifyUrl = `${baseUrl}/api/cashfree/webhook`;
 
   const orderPayload = {
     order_id: orderId,
@@ -29,60 +45,115 @@ export async function createCashfreeOrder(params: CreateOrderParams) {
       customer_phone: cleanPhone
     },
     order_meta: {
-      return_url: `${process.env.APP_URL || ""}/?order_id={order_id}&payment_status=cashfree_return`
+      return_url: returnUrl,
+      notify_url: notifyUrl
     },
-    order_note: notes || `Saman Adhikar Party ${orderType === "MEMBERSHIP" ? "Membership Fee" : "Donation"}`
+    order_note: notes || `Saman Adhikar Party ${orderType === "MEMBERSHIP" ? "Membership Registration" : "Rashtra Nirman Contribution"}`
   };
 
   // If live/sandbox credentials exist, call Cashfree PG API
   if (CONFIG.CASHFREE.APP_ID && CONFIG.CASHFREE.SECRET_KEY) {
-    const response = await fetch(`${CONFIG.CASHFREE.API_BASE}/orders`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-client-id": CONFIG.CASHFREE.APP_ID,
-        "x-client-secret": CONFIG.CASHFREE.SECRET_KEY,
-        "x-api-version": CONFIG.CASHFREE.API_VERSION
-      },
-      body: JSON.stringify(orderPayload)
-    });
+    try {
+      const response = await fetch(`${CONFIG.CASHFREE.API_BASE}/orders`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-client-id": CONFIG.CASHFREE.APP_ID,
+          "x-client-secret": CONFIG.CASHFREE.SECRET_KEY,
+          "x-api-version": CONFIG.CASHFREE.API_VERSION
+        },
+        body: JSON.stringify(orderPayload)
+      });
 
-    const data = await response.json();
-    if (response.ok && data.payment_session_id) {
+      const data = await response.json();
+      if (response.ok && data.payment_session_id) {
+        const orderRecord: CashfreeOrderRecord = {
+          orderId: data.order_id || orderId,
+          paymentSessionId: data.payment_session_id,
+          orderAmount: Number(orderAmount),
+          orderType: orderType || "DONATION",
+          orderStatus: "ACTIVE",
+          donorData: donorData || {
+            donorName: cleanName,
+            amount: Number(orderAmount),
+            phone: cleanPhone,
+            email: cleanEmail
+          },
+          memberData,
+          createdAt: new Date().toISOString()
+        };
+        await saveCashfreeOrder(orderRecord);
+
+        return {
+          success: true,
+          paymentSessionId: data.payment_session_id,
+          orderId: data.order_id || orderId,
+          orderAmount: data.order_amount || orderAmount,
+          returnUrl,
+          mode: CONFIG.CASHFREE.ENV,
+          apiEndpoint: CONFIG.CASHFREE.API_BASE
+        };
+      }
+
+      console.error("Cashfree order creation error response:", data);
       return {
-        success: true,
-        paymentSessionId: data.payment_session_id,
-        orderId: data.order_id,
-        orderAmount: data.order_amount,
-        mode: CONFIG.CASHFREE.ENV,
-        apiEndpoint: CONFIG.CASHFREE.API_BASE
+        success: false,
+        error: data.message || "कैशफ्री गेटवे पर आर्डर बनाने में त्रुटि हुई।",
+        details: data
+      };
+    } catch (err: any) {
+      console.error("Cashfree API network error:", err);
+      return {
+        success: false,
+        error: "कैशफ्री भुगतान गेटवे से संपर्क स्थापित नहीं हो सका।"
       };
     }
-
-    return {
-      success: false,
-      error: data.message || "कैशफ्री गेटवे पर आर्डर बनाने में त्रुटि हुई।",
-      details: data
-    };
   }
 
-  // Fallback demo session when credentials are not configured in environment
-  const simulatedSessionId = `session_cf_test_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
+  // Simulated fallback session when environment secrets are not populated
+  const simulatedSessionId = `session_cf_test_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  const simulatedRecord: CashfreeOrderRecord = {
+    orderId,
+    paymentSessionId: simulatedSessionId,
+    orderAmount: Number(orderAmount),
+    orderType: orderType || "DONATION",
+    orderStatus: "ACTIVE",
+    donorData: donorData || {
+      donorName: cleanName,
+      amount: Number(orderAmount),
+      phone: cleanPhone,
+      email: cleanEmail
+    },
+    memberData,
+    createdAt: new Date().toISOString()
+  };
+  await saveCashfreeOrder(simulatedRecord);
+
   return {
     success: true,
     paymentSessionId: simulatedSessionId,
     orderId,
     orderAmount: Number(orderAmount),
+    returnUrl,
     mode: "sandbox",
     isSimulated: true,
-    message: "कैशफ्री पेमेंट सेशन तैयार है (Cashfree Payment Session Initialized).",
+    message: "कैशफ्री पेमेंट सत्र तैयार है (Cashfree Web Redirect Session Initialized).",
     apiEndpoint: CONFIG.CASHFREE.API_BASE
   };
 }
 
-export async function verifyCashfreePayment(orderId: string): Promise<{ isPaid: boolean; transactionId: string }> {
+export async function verifyCashfreePayment(orderId: string): Promise<{
+  isPaid: boolean;
+  orderStatus: string;
+  transactionId: string;
+  paymentMethod: string;
+  details?: any;
+}> {
   let isPaid = false;
+  let orderStatus = "ACTIVE";
   let transactionId = `CF-TXN-${Date.now().toString().slice(-8)}`;
+  let paymentMethod = "Cashfree Hosted Checkout (api.cashfree.com)";
+  let details: any = null;
 
   if (CONFIG.CASHFREE.APP_ID && CONFIG.CASHFREE.SECRET_KEY) {
     try {
@@ -95,18 +166,174 @@ export async function verifyCashfreePayment(orderId: string): Promise<{ isPaid: 
       });
 
       const orderDetails = await checkRes.json();
-      if (orderDetails && (orderDetails.order_status === "PAID" || orderDetails.order_status === "ACTIVE")) {
-        isPaid = true;
-        transactionId = orderDetails.cf_order_id ? `CF-${orderDetails.cf_order_id}` : transactionId;
+      details = orderDetails;
+
+      if (orderDetails && orderDetails.order_status) {
+        orderStatus = orderDetails.order_status;
+        if (orderStatus === "PAID") {
+          isPaid = true;
+          transactionId = orderDetails.cf_order_id ? `CF-${orderDetails.cf_order_id}` : transactionId;
+
+          // Attempt to fetch detailed payment methods from Cashfree Payments API
+          try {
+            const payRes = await fetch(`${CONFIG.CASHFREE.API_BASE}/orders/${orderId}/payments`, {
+              headers: {
+                "x-client-id": CONFIG.CASHFREE.APP_ID,
+                "x-client-secret": CONFIG.CASHFREE.SECRET_KEY,
+                "x-api-version": CONFIG.CASHFREE.API_VERSION
+              }
+            });
+            const payList = await payRes.json();
+            if (Array.isArray(payList) && payList.length > 0) {
+              const successfulPay = payList.find((p: any) => p.payment_status === "SUCCESS") || payList[0];
+              if (successfulPay) {
+                if (successfulPay.cf_payment_id) {
+                  transactionId = `CF-PAY-${successfulPay.cf_payment_id}`;
+                }
+                if (successfulPay.payment_method) {
+                  const m = successfulPay.payment_method;
+                  if (typeof m === "string") {
+                    paymentMethod = `Cashfree (${m.toUpperCase()})`;
+                  } else if (typeof m === "object") {
+                    const k = Object.keys(m)[0];
+                    paymentMethod = `Cashfree (${k ? k.toUpperCase() : "Online"})`;
+                  }
+                }
+              }
+            }
+          } catch (payErr) {
+            console.warn("Could not fetch detailed payments list from Cashfree:", payErr);
+          }
+        }
       }
     } catch (e) {
       console.error("Cashfree verification lookup error:", e);
     }
   } else {
+    // In simulated/sandbox demo mode without keys
     isPaid = true;
+    orderStatus = "PAID";
+    transactionId = `CF-SIM-${Date.now().toString().slice(-8)}`;
+    paymentMethod = "Cashfree PG Simulator";
   }
 
-  return { isPaid, transactionId };
+  return { isPaid, orderStatus, transactionId, paymentMethod, details };
+}
+
+/**
+ * Validates order status after redirect return and creates receipt / membership records idempotently
+ */
+export async function processOrderCompletion(orderId: string, customDonorData?: any, customMemberData?: any) {
+  const existingOrder = await getCashfreeOrder(orderId);
+  const { isPaid, orderStatus, transactionId, paymentMethod, details } = await verifyCashfreePayment(orderId);
+
+  if (!isPaid) {
+    return {
+      success: false,
+      orderStatus,
+      message: orderStatus === "ACTIVE" 
+        ? "भुगतान अभी प्रक्रिया में है (Payment in progress) अथवा पूर्ण नहीं हुआ।" 
+        : "भुगतान असफल अथवा निरस्त (Payment failed or cancelled).",
+      details
+    };
+  }
+
+  // Already processed and paid? Return saved receipt/member
+  if (existingOrder && existingOrder.orderStatus === "PAID" && (existingOrder.receipt || existingOrder.memberCard)) {
+    return {
+      success: true,
+      orderStatus: "PAID",
+      transactionId: existingOrder.transactionId || transactionId,
+      orderType: existingOrder.orderType,
+      receipt: existingOrder.receipt,
+      member: existingOrder.memberCard,
+      alreadyProcessed: true
+    };
+  }
+
+  const orderType = existingOrder?.orderType || (customMemberData ? "MEMBERSHIP" : "DONATION");
+  const donorInfo = customDonorData || existingOrder?.donorData;
+  const memberInfo = customMemberData || existingOrder?.memberData;
+  const partyInfo = await getPartyInfo();
+
+  let receipt: any = null;
+  let member: any = null;
+
+  if (orderType === "DONATION" && donorInfo) {
+    // Check if donation already added to prevent duplicate entries
+    const allDonations = await getDonations();
+    const existingDonation = allDonations.find((d) => d.id === `DON-${orderId}`);
+
+    if (existingDonation) {
+      receipt = buildTaxReceipt(existingDonation, partyInfo, transactionId, paymentMethod);
+    } else {
+      const newDonation: DonationRecord = {
+        id: `DON-${orderId}`,
+        donorName: donorInfo.isAnonymous ? "गुप्त राष्ट्रभक्त (Anonymous Patriot)" : (donorInfo.donorName || "समर्थक नागरिक"),
+        amount: Number(donorInfo.amount || existingOrder?.orderAmount || 500),
+        frequency: donorInfo.frequency || "one-time",
+        precinct: donorInfo.donorState || "राष्ट्रीय मुख्यालय",
+        timestamp: new Date().toISOString(),
+        isAnonymous: Boolean(donorInfo.isAnonymous),
+        message: donorInfo.message || `Cashfree Web Checkout (${orderId})`,
+        citizenship: donorInfo.citizenship || "INDIAN",
+        phone: donorInfo.phone,
+        email: donorInfo.email,
+        state: donorInfo.donorState,
+        passportNumber: donorInfo.passportNumber
+      };
+
+      await addDonation(newDonation);
+      receipt = buildTaxReceipt(newDonation, partyInfo, transactionId, paymentMethod);
+    }
+  } else if (orderType === "MEMBERSHIP" && memberInfo) {
+    const allMembers = await getMembers();
+    const existingMem = allMembers.find((m) => m.utrNumber === transactionId || m.id === `MEM-${orderId}`);
+
+    if (existingMem) {
+      member = existingMem;
+    } else {
+      const memberCardId = `SAP-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+      const newMember: MemberRecord = {
+        id: `MEM-${orderId}`,
+        fullName: String(memberInfo.fullName || "समान अधिकार पार्टी सदस्य").trim(),
+        email: memberInfo.email || `${String(memberInfo.phone || "member").trim()}@samanadhikarparty.org`,
+        phone: String(memberInfo.phone || "").trim(),
+        precinct: memberInfo.precinct || "आगरा (Agra)",
+        membershipTier: memberInfo.membershipTier || "साधारण सदस्य",
+        membershipFee: Number(memberInfo.membershipFee || existingOrder?.orderAmount || 10),
+        joinedDate: new Date().toISOString().split("T")[0],
+        memberCardId,
+        interests: memberInfo.interests || ["समान अधिकार अभियान"],
+        paymentMethod,
+        utrNumber: transactionId,
+        isFeePaid: true
+      };
+
+      await addMember(newMember);
+      member = newMember;
+    }
+  }
+
+  // Update order record
+  await updateCashfreeOrder(orderId, {
+    orderStatus: "PAID",
+    transactionId,
+    paymentMethod,
+    receipt,
+    memberCard: member,
+    completedAt: new Date().toISOString()
+  });
+
+  return {
+    success: true,
+    orderStatus: "PAID",
+    orderId,
+    transactionId,
+    orderType,
+    receipt,
+    member
+  };
 }
 
 export function buildTaxReceipt(donation: DonationRecord, partyInfo: PartyInfo, transactionId: string, paymentMethod?: string) {

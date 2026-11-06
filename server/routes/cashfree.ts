@@ -1,29 +1,46 @@
 import { Router } from "express";
-import { createCashfreeOrder, verifyCashfreePayment, buildTaxReceipt } from "../services/cashfreeService";
-import { addDonation } from "../database/repositories/donationRepository";
-import { addMember } from "../database/repositories/memberRepository";
-import { getPartyInfo } from "../database/repositories/partyRepository";
+import { createCashfreeOrder, processOrderCompletion } from "../services/cashfreeService";
+import { getCashfreeOrder } from "../database/repositories/cashfreeRepository";
 import { donationLimiter } from "../middleware/rateLimiter";
-import { DonationRecord, MemberRecord } from "../types";
 
 export const cashfreeRouter = Router();
 
+// Helper to determine absolute request host URL for return_url
+function getBaseAppUrl(req: any): string {
+  const origin = req.headers.origin || req.headers.referer;
+  if (origin && typeof origin === "string" && origin.startsWith("http")) {
+    try {
+      const url = new URL(origin);
+      return `${url.protocol}//${url.host}`;
+    } catch {}
+  }
+  const host = req.get("host") || "localhost:3000";
+  const proto = req.secure || req.headers["x-forwarded-proto"] === "https" ? "https" : "http";
+  return `${proto}://${host}`;
+}
+
 // POST /api/cashfree/create-order
+// Initiates server-side order with Cashfree Orders API per https://www.cashfree.com/docs/payments/online/web/redirect
 cashfreeRouter.post("/create-order", donationLimiter, async (req, res) => {
   try {
-    const { orderAmount, customerName, customerPhone, customerEmail, orderType, notes } = req.body;
+    const { orderAmount, customerName, customerPhone, customerEmail, orderType, notes, donorData, memberData } = req.body;
 
     if (!orderAmount || Number(orderAmount) <= 0) {
       return res.status(400).json({ success: false, error: "कृपया मान्य भुगतान राशि दर्ज करें।" });
     }
+
+    const appUrl = getBaseAppUrl(req);
 
     const result = await createCashfreeOrder({
       orderAmount: Number(orderAmount),
       customerName,
       customerPhone,
       customerEmail,
-      orderType,
-      notes
+      orderType: orderType || "DONATION",
+      notes,
+      appUrl,
+      donorData,
+      memberData
     });
 
     if (result.success) {
@@ -31,90 +48,64 @@ cashfreeRouter.post("/create-order", donationLimiter, async (req, res) => {
     }
     return res.status(400).json(result);
   } catch (err: any) {
-    console.error("Cashfree order creation error:", err);
+    console.error("Cashfree order creation route error:", err);
     return res.status(500).json({ success: false, error: "कैशफ्री आर्डर प्रक्रिया में तकनीकी त्रुटि।" });
   }
 });
 
+// GET /api/cashfree/order-status/:orderId
+// Used by frontend on return_url redirect to inspect status and generate 80GGC receipt / member card
+cashfreeRouter.get("/order-status/:orderId", async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    if (!orderId) {
+      return res.status(400).json({ success: false, error: "Order ID आवश्यक है।" });
+    }
+
+    const result = await processOrderCompletion(String(orderId));
+    return res.json(result);
+  } catch (err: any) {
+    console.error("Cashfree order status check error:", err);
+    return res.status(500).json({ success: false, error: "भुगतान स्थिति जांचने में तकनीकी त्रुटि।" });
+  }
+});
+
 // POST /api/cashfree/verify-order
+// Direct or fallback order verification
 cashfreeRouter.post("/verify-order", async (req, res) => {
   try {
-    const { orderId, donorData, memberData, orderType } = req.body;
+    const { orderId, donorData, memberData } = req.body;
 
     if (!orderId) {
       return res.status(400).json({ success: false, error: "Order ID आवश्यक है।" });
     }
 
-    const { isPaid, transactionId } = await verifyCashfreePayment(String(orderId));
-
-    if (!isPaid) {
-      return res.status(400).json({ success: false, error: "भुगतान अभी पूर्ण या सत्यापित नहीं हुआ है।" });
+    const result = await processOrderCompletion(String(orderId), donorData, memberData);
+    if (result.success) {
+      return res.json(result);
     }
-
-    // Handle Donation
-    if (orderType === "DONATION" && donorData) {
-      const newDonation: DonationRecord = {
-        id: `DON-${Math.floor(1000 + Math.random() * 9000)}`,
-        donorName: donorData.isAnonymous ? "गुप्त राष्ट्रभक्त (Anonymous Patriot)" : (donorData.donorName || "समर्थक"),
-        amount: Number(donorData.amount),
-        frequency: donorData.frequency || "one-time",
-        precinct: donorData.donorState || "आगरा HQ",
-        timestamp: new Date().toISOString(),
-        isAnonymous: Boolean(donorData.isAnonymous),
-        message: donorData.message || "Cashfree PG Verified",
-        citizenship: donorData.citizenship || "INDIAN",
-        phone: donorData.phone || undefined,
-        state: donorData.donorState || undefined,
-        passportNumber: donorData.passportNumber || undefined
-      };
-
-      await addDonation(newDonation);
-      const partyInfo = await getPartyInfo();
-      const receipt = buildTaxReceipt(newDonation, partyInfo, transactionId, "Cashfree PG (api.cashfree.com)");
-
-      return res.json({
-        success: true,
-        donation: newDonation,
-        receipt
-      });
-    }
-
-    // Handle Membership
-    if (orderType === "MEMBERSHIP" && memberData) {
-      const memberCardId = `SAP-2026-${Math.floor(1000 + Math.random() * 9000)}`;
-      const newMember: MemberRecord = {
-        id: `MEM-${Math.floor(1000 + Math.random() * 9000)}`,
-        fullName: String(memberData.fullName).trim(),
-        email: `${String(memberData.phone).trim()}@samanadhikarparty.org`,
-        phone: String(memberData.phone).trim(),
-        precinct: memberData.precinct || "आगरा (Agra)",
-        membershipTier: memberData.membershipTier || "साधारण सदस्य",
-        membershipFee: Number(memberData.membershipFee) || 10,
-        joinedDate: new Date().toISOString().split("T")[0],
-        memberCardId,
-        interests: memberData.interests || ["समान अधिकार अभियान"],
-        paymentMethod: "Cashfree PG (api.cashfree.com)",
-        utrNumber: transactionId,
-        isFeePaid: true
-      };
-
-      await addMember(newMember);
-
-      return res.json({
-        success: true,
-        member: newMember,
-        message: "सदस्यता पंजीकरण व कैशफ्री भुगतान सफल!"
-      });
-    }
-
-    return res.json({
-      success: true,
-      orderId,
-      transactionId,
-      message: "कैशफ्री भुगतान सफलतापूर्वक सत्यापित हुआ।"
-    });
+    return res.status(400).json(result);
   } catch (err: any) {
     console.error("Cashfree verification error:", err);
     return res.status(500).json({ success: false, error: "भुगतान सत्यापन में तकनीकी त्रुटि।" });
+  }
+});
+
+// POST /api/cashfree/webhook
+// Cashfree server-to-server webhook callback
+cashfreeRouter.post("/webhook", async (req, res) => {
+  try {
+    const webhookData = req.body;
+    console.log("Received Cashfree webhook:", webhookData?.type || "generic");
+
+    const orderId = webhookData?.data?.order?.order_id || webhookData?.order_id;
+    if (orderId) {
+      await processOrderCompletion(String(orderId));
+    }
+
+    return res.json({ status: "OK", received: true });
+  } catch (err: any) {
+    console.error("Cashfree webhook processing error:", err);
+    return res.status(200).json({ status: "ERROR_LOGGED" });
   }
 });

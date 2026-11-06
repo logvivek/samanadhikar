@@ -125,3 +125,19 @@ export interface JwtAdminPayload {
   iat?: number;
   exp?: number;
 }
+
+export interface CashfreeOrderRecord {
+  orderId: string;
+  paymentSessionId: string;
+  orderAmount: number;
+  orderType: "DONATION" | "MEMBERSHIP";
+  orderStatus: "ACTIVE" | "PAID" | "FAILED" | "EXPIRED";
+  donorData?: any;
+  memberData?: any;
+  receipt?: any;
+  memberCard?: any;
+  transactionId?: string;
+  paymentMethod?: string;
+  createdAt: string;
+  completedAt?: string;
+}

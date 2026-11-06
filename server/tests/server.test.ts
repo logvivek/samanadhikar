@@ -224,5 +224,39 @@ describe("Production Server & Security Architecture Tests", () => {
       expect(res.body.receipt).toBeDefined();
       expect(res.body.receipt.fecTaxNotice).toContain("80GGC");
     });
+
+    it("POST /api/cashfree/create-order should generate Cashfree session and return_url per redirect docs", async () => {
+      const res = await request(app)
+        .post("/api/cashfree/create-order")
+        .send({
+          orderAmount: 1100,
+          customerName: "राजेश कुमार शर्मा",
+          customerPhone: "9876543210",
+          orderType: "DONATION",
+          notes: "राष्ट्र निर्माण सहयोग",
+          donorData: {
+            donorName: "राजेश कुमार शर्मा",
+            amount: 1100,
+            donorState: "उत्तर प्रदेश",
+            isAnonymous: false
+          }
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.paymentSessionId).toBeDefined();
+      expect(res.body.orderId).toMatch(/^order_sap_\d+_\d+$/);
+      expect(res.body.returnUrl).toContain("?order_id={order_id}&payment_status=cashfree_return");
+
+      // Verify checking status on return URL
+      const statusRes = await request(app)
+        .get(`/api/cashfree/order-status/${res.body.orderId}`);
+
+      expect(statusRes.status).toBe(200);
+      expect(statusRes.body.success).toBe(true);
+      expect(statusRes.body.receipt).toBeDefined();
+      expect(statusRes.body.receipt.fecTaxNotice).toContain("80GGC");
+      expect(statusRes.body.receipt.amount).toBe(1100);
+    });
   });
 });

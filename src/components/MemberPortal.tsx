@@ -28,8 +28,11 @@ import {
   Landmark,
   FileText,
   Copy,
-  X
+  X,
+  Loader2,
+  ArrowRight
 } from "lucide-react";
+import { load as loadCashfree } from "@cashfreepayments/cashfree-js";
 
 const TIER_FEE_MAP: Record<string, number> = {
   "साधारण सदस्य": 10,
@@ -99,6 +102,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
   const [enteredOtp, setEnteredOtp] = useState<string>("");
 
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [isCashfreeLoading, setIsCashfreeLoading] = useState<boolean>(false);
   const [activeMemberCard, setActiveMemberCard] = useState<MemberRecord | null>(null);
 
   const officialUpiId = PARTY_INFO.bankDetails.upiId?.trim() || "samanadhikarparty@sbi";
@@ -353,6 +357,72 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
     }, 1200);
   };
 
+  const handlePayMembershipWithCashfree = async () => {
+    setPaymentError("");
+    setIsCashfreeLoading(true);
+
+    try {
+      const memberData = {
+        fullName: fullName.trim(),
+        phone: phone.trim(),
+        precinct,
+        membershipTier,
+        interests: ["समान अधिकार अभियान"],
+        membershipFee,
+        isFeePaid: true
+      };
+
+      const res = await fetch("/api/cashfree/create-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderAmount: membershipFee,
+          customerName: fullName.trim(),
+          customerPhone: phone.trim(),
+          orderType: "MEMBERSHIP",
+          notes: `SAP Membership - ${membershipTier} (₹${membershipFee})`,
+          memberData
+        })
+      });
+
+      const orderData = await res.json();
+      if (!orderData.success || !orderData.paymentSessionId) {
+        setPaymentError(orderData.error || "कैशफ्री गेटवे सत्र बनाने में समस्या आई।");
+        setIsCashfreeLoading(false);
+        return;
+      }
+
+      let cashfree: any = null;
+      if (typeof window !== "undefined" && typeof (window as any).Cashfree === "function") {
+        cashfree = (window as any).Cashfree({
+          mode: orderData.mode === "production" ? "production" : "sandbox"
+        });
+      } else {
+        cashfree = await loadCashfree({
+          mode: orderData.mode === "production" ? "production" : "sandbox"
+        });
+      }
+
+      if (cashfree && typeof cashfree.checkout === "function") {
+        cashfree.checkout({
+          paymentSessionId: orderData.paymentSessionId,
+          redirectTarget: "_self" // Standard Web Redirect
+        }).then((result: any) => {
+          if (result && result.error) {
+            setPaymentError(result.error.message || "कैशफ्री चेकआउट में त्रुटि आई।");
+          }
+        }).catch((err: any) => {
+          console.warn("Cashfree checkout error:", err);
+        });
+      }
+    } catch (err) {
+      console.error(err);
+      setPaymentError("कैशफ्री गेटवे से संपर्क स्थापित नहीं हो सका।");
+    } finally {
+      setIsCashfreeLoading(false);
+    }
+  };
+
   return (
     <section className="py-10 bg-gradient-to-b from-orange-50/40 via-white to-orange-50/60 text-slate-900 min-h-screen">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
@@ -553,6 +623,43 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
                     <span className="text-[10px] text-slate-500 font-bold block uppercase">सदस्यता शुल्क</span>
                     <span className="text-lg font-black text-orange-600">₹{membershipFee}</span>
                   </div>
+                </div>
+
+                {/* Cashfree Web Redirect Checkout Button */}
+                <div className="bg-orange-50/80 border border-orange-300 rounded-2xl p-4 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-orange-950 flex items-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                      <span>कैशफ्री सुरक्षित पेमेंट गेटवे (Cashfree PG Checkout)</span>
+                    </span>
+                    <span className="text-[10px] bg-emerald-100 text-emerald-900 font-bold px-2 py-0.5 rounded-full">
+                      Instant Card / UPI / NetBanking
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handlePayMembershipWithCashfree}
+                    disabled={isCashfreeLoading}
+                    className="w-full py-3 px-4 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-black text-xs shadow-md flex items-center justify-center space-x-2 cursor-pointer transition-all disabled:opacity-75"
+                  >
+                    {isCashfreeLoading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin text-white" />
+                        <span>कैशफ्री गेटवे कनेक्ट हो रहा है...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Pay ₹{membershipFee} via Cashfree (Web Redirect)</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <div className="text-center">
+                  <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400">
+                    — अथवा अन्य प्रत्यक्ष माध्यम चुनें (Or Direct Modes) —
+                  </span>
                 </div>
 
                 {/* Payment Tabs */}

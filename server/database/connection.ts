@@ -9,7 +9,8 @@ import {
   EventRecord,
   DonationRecord,
   MemberRecord,
-  EventRsvpRecord
+  EventRsvpRecord,
+  CashfreeOrderRecord
 } from "../types";
 import { PARTY_INFO, PRESS_RELEASES_SEED, CAMPAIGN_EVENTS } from "../../src/data/campaignData";
 
@@ -26,6 +27,7 @@ export interface DatabaseSchema {
   donations: DonationRecord[];
   members: MemberRecord[];
   eventRsvps: EventRsvpRecord[];
+  cashfreeOrders: CashfreeOrderRecord[];
 }
 
 let dbMemory: DatabaseSchema | null = null;
@@ -99,7 +101,8 @@ export function getDefaultDatabase(): DatabaseSchema {
     archivedEvents: [],
     donations: defaultDonations,
     members: [],
-    eventRsvps: []
+    eventRsvps: [],
+    cashfreeOrders: []
   };
 }
 
@@ -131,6 +134,7 @@ export function initDatabase(): DatabaseSchema {
       if (!parsed.donations) parsed.donations = [];
       if (!parsed.members) parsed.members = [];
       if (!parsed.eventRsvps) parsed.eventRsvps = [];
+      if (!parsed.cashfreeOrders) parsed.cashfreeOrders = [];
       if (!parsed.partyInfo) parsed.partyInfo = { ...PARTY_INFO };
 
       dbMemory = parsed as DatabaseSchema;

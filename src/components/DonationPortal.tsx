@@ -322,6 +322,19 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
 
     setIsCashfreeLoading(true);
     try {
+      const donorData = {
+        donorName: isAnonymous ? "गुप्त राष्ट्रभक्त (Anonymous Patriot)" : (donorName || "समर्थक नागरिक"),
+        amount,
+        frequency,
+        precinct: donorState || "राष्ट्रीय मुख्यालय",
+        isAnonymous,
+        message: message || "Cashfree Web Redirect Contribution",
+        citizenship,
+        phone,
+        donorState,
+        passportNumber: citizenship === "NRI" ? passportNumber : undefined
+      };
+
       // 1. Create order on server (connecting to api.cashfree.com/pg/orders)
       const res = await fetch("/api/cashfree/create-order", {
         method: "POST",
@@ -331,7 +344,8 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
           customerName: isAnonymous ? "गुप्त राष्ट्रभक्त" : (donorName || "समर्थक नागरिक"),
           customerPhone: phone,
           orderType: "DONATION",
-          notes: `Saman Adhikar Party Contribution - ₹${amount}`
+          notes: `Saman Adhikar Party Contribution - ₹${amount}`,
+          donorData
         })
       });
 
@@ -346,35 +360,38 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
       setCashfreeOrderId(orderData.orderId);
       setCashfreeSessionId(orderData.paymentSessionId);
 
-      // 2. Initialize Cashfree JS SDK v3
-      let sdkLaunched = false;
-      try {
-        const cashfree = await loadCashfree({
+      // 2. Initialize Cashfree JS SDK v3 per https://www.cashfree.com/docs/payments/online/web/redirect
+      let cashfree: any = null;
+      if (typeof window !== "undefined" && typeof (window as any).Cashfree === "function") {
+        cashfree = (window as any).Cashfree({
           mode: orderData.mode === "production" ? "production" : "sandbox"
         });
-
-        if (cashfree && typeof cashfree.checkout === "function") {
-          sdkLaunched = true;
-          cashfree.checkout({
-            paymentSessionId: orderData.paymentSessionId,
-            redirectTarget: "_modal"
-          }).then(async (result: any) => {
-            if (result && result.error) {
-              console.warn("Cashfree modal closed or error:", result.error);
-              setShowCashfreeModal(true);
-            } else {
-              // Successfully completed checkout
-              await verifyAndCompleteCashfreeOrder(orderData.orderId, orderData.paymentSessionId);
-            }
-          }).catch(() => {
-            setShowCashfreeModal(true);
-          });
-        }
-      } catch (sdkErr) {
-        console.warn("Cashfree SDK loader fallback:", sdkErr);
+      } else {
+        cashfree = await loadCashfree({
+          mode: orderData.mode === "production" ? "production" : "sandbox"
+        });
       }
 
-      if (!sdkLaunched) {
+      // 3. Trigger Cashfree Web Redirect Checkout
+      if (cashfree && typeof cashfree.checkout === "function") {
+        const checkoutOptions = {
+          paymentSessionId: orderData.paymentSessionId,
+          redirectTarget: "_self" // Standard Cashfree Web Redirect flow per document
+        };
+
+        cashfree.checkout(checkoutOptions).then(async (result: any) => {
+          if (result && result.error) {
+            console.warn("Cashfree checkout error:", result.error);
+            setPaymentError(result.error.message || "कैशफ्री गेटवे में समस्या आई।");
+            setShowCashfreeModal(true);
+          } else if (result && result.redirect) {
+            console.log("Cashfree payment redirect initiated to hosted page");
+          }
+        }).catch((err: any) => {
+          console.warn("Cashfree checkout execution error, falling back:", err);
+          setShowCashfreeModal(true);
+        });
+      } else {
         setShowCashfreeModal(true);
       }
     } catch (err) {
