@@ -51,11 +51,14 @@ export const CONFIG = {
   SALT_ROUNDS: 12,
   MAX_ACTIVE_RECORDS: 100,
   
-  // Cashfree PG Settings
+  // Cashfree PG Settings (Default to production https://api.cashfree.com/pg/orders)
   CASHFREE: {
     API_BASE: process.env.CASHFREE_ENV === "sandbox"
       ? "https://sandbox.cashfree.com/pg"
       : "https://api.cashfree.com/pg",
+    ORDERS_ENDPOINT: process.env.CASHFREE_ENV === "sandbox"
+      ? "https://sandbox.cashfree.com/pg/orders"
+      : "https://api.cashfree.com/pg/orders",
     APP_ID: process.env.CASHFREE_APP_ID || process.env.VITE_CASHFREE_APP_ID || "",
     SECRET_KEY: process.env.CASHFREE_SECRET_KEY || "",
     API_VERSION: "2023-08-01",

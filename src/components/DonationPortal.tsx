@@ -930,16 +930,18 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
               <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 pt-1">
                 <button
                   type="button"
-                  onClick={handleProceedToPayment}
-                  className="w-full sm:w-auto flex-1 py-2.5 px-4 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center justify-center space-x-1.5 cursor-pointer transition-all"
+                  disabled={true}
+                  className="w-full sm:w-auto flex-1 py-2.5 px-4 rounded-xl border border-slate-200 bg-slate-100 text-slate-400 font-bold text-xs flex items-center justify-center space-x-1.5 cursor-not-allowed opacity-60"
+                  title="सीधे बैंक ट्रांसफर / अन्य माध्यम अक्षम है। कृपया ऊपर दिए गए कैशफ्री आधिकारिक गेटवे द्वारा ही सुरक्षित भुगतान करें।"
                 >
-                  <QrCode className="w-4 h-4 text-orange-600" />
-                  <span>अन्य माध्यम (Direct UPI QR / Bank Transfer)</span>
+                  <Lock className="w-3.5 h-3.5 text-slate-400" />
+                  <span className="line-through">अन्य माध्यम / Bank Transfer</span>
+                  <span className="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-black">अक्षम (Disabled)</span>
                 </button>
 
                 <div className="flex items-center space-x-1.5 text-[11px] font-bold text-slate-500">
                   <Lock className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span>256-Bit SSL • api.cashfree.com</span>
+                  <span>256-Bit SSL • api.cashfree.com/pg/orders</span>
                 </div>
               </div>
             </div>
@@ -1037,18 +1039,16 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
                     <span className="text-xs leading-tight">डिजिटल वॉलेट्स</span>
                   </button>
 
-                  {/* 5. NEFT / RTGS */}
+                  {/* 5. NEFT / RTGS (Direct Bank Transfer Disabled) */}
                   <button
                     type="button"
-                    onClick={() => setPaymentTab("neft")}
-                    className={`p-3 rounded-2xl border-2 text-center transition-all cursor-pointer flex flex-col items-center justify-center space-y-1.5 ${
-                      paymentTab === "neft"
-                        ? "border-orange-600 bg-orange-50 text-orange-950 shadow-md font-black"
-                        : "border-slate-200 hover:border-orange-300 text-slate-700 font-bold"
-                    }`}
+                    disabled={true}
+                    className="p-3 rounded-2xl border-2 border-slate-200 bg-slate-100 text-slate-400 text-center transition-all cursor-not-allowed opacity-50 flex flex-col items-center justify-center space-y-1.5"
+                    title="बैंक ट्रांसफर माध्यम अक्षम है। कृपया कैशफ्री आधिकारिक गेटवे द्वारा भुगतान करें।"
                   >
-                    <Building2 className="w-5 h-5 text-orange-600" />
-                    <span className="text-xs leading-tight">NEFT / RTGS</span>
+                    <Building2 className="w-5 h-5 text-slate-400" />
+                    <span className="text-xs leading-tight line-through">Bank Transfer</span>
+                    <span className="text-[9px] bg-slate-200 text-slate-600 px-1 py-0.5 rounded font-black">अक्षम</span>
                   </button>
 
                   {/* 6. Cheque / DD */}

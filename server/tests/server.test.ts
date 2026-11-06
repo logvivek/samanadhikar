@@ -247,6 +247,7 @@ describe("Production Server & Security Architecture Tests", () => {
       expect(res.body.paymentSessionId).toBeDefined();
       expect(res.body.orderId).toMatch(/^order_sap_\d+_\d+$/);
       expect(res.body.returnUrl).toContain("?order_id={order_id}&payment_status=cashfree_return");
+      expect(res.body.apiEndpoint).toBe("https://api.cashfree.com/pg/orders");
 
       // Verify checking status on return URL
       const statusRes = await request(app)

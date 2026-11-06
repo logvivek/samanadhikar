@@ -658,7 +658,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
 
                 <div className="text-center">
                   <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400">
-                    — अथवा अन्य प्रत्यक्ष माध्यम चुनें (Or Direct Modes) —
+                    — आधिकारिक कैशफ्री भुगतान गेटवे (Cashfree Payment Gateway) —
                   </span>
                 </div>
 
