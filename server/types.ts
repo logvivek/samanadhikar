@@ -90,6 +90,8 @@ export interface DonationRecord {
   state?: string;
   pinCode?: string;
   passportNumber?: string;
+  paymentMethod?: string;
+  utrNumber?: string;
 }
 
 export interface MemberRecord {

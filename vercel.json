@@ -1,0 +1,37 @@
+{
+  "version": 2,
+  "rewrites": [
+    {
+      "source": "/api/cashfree/create-order",
+      "destination": "/api/cashfree/create-order"
+    },
+    {
+      "source": "/api/cashfree/order-status/:orderId",
+      "destination": "/api/cashfree/order-status/[orderId]"
+    },
+    {
+      "source": "/api/cashfree/verify-order",
+      "destination": "/api/cashfree/verify-order"
+    },
+    {
+      "source": "/api/cashfree/webhook",
+      "destination": "/api/cashfree/webhook"
+    },
+    {
+      "source": "/api/donations",
+      "destination": "/api/donations"
+    },
+    {
+      "source": "/api/party-info",
+      "destination": "/api/party-info"
+    },
+    {
+      "source": "/api/(.*)",
+      "destination": "/api"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
+  ]
+}

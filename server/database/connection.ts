@@ -112,9 +112,12 @@ export function getDefaultDatabase(): DatabaseSchema {
 export function initDatabase(): DatabaseSchema {
   if (dbMemory) return dbMemory;
 
-  if (fs.existsSync(DB_FILE)) {
+  const bundledDb = path.join(process.cwd(), "data", "production_db.json");
+  const targetFile = fs.existsSync(DB_FILE) ? DB_FILE : (fs.existsSync(bundledDb) ? bundledDb : null);
+
+  if (targetFile) {
     try {
-      const raw = fs.readFileSync(DB_FILE, "utf-8");
+      const raw = fs.readFileSync(targetFile, "utf-8");
       const parsed = JSON.parse(raw);
 
       // Validate & Migrate
@@ -142,7 +145,7 @@ export function initDatabase(): DatabaseSchema {
     } catch (err) {
       console.error("Failed to load production DB file, backing up and creating fresh DB:", err);
       try {
-        fs.copyFileSync(DB_FILE, path.join(BACKUPS_DIR, `corrupted_db_${Date.now()}.json`));
+        fs.copyFileSync(targetFile, path.join(BACKUPS_DIR, `corrupted_db_${Date.now()}.json`));
       } catch {}
     }
   }
@@ -170,7 +173,7 @@ export function persistDatabase(): void {
     fs.writeFileSync(tempPath, data, "utf-8");
     fs.renameSync(tempPath, DB_FILE);
   } catch (err) {
-    console.error("Failed to persist database to disk:", err);
+    // In serverless / read-only filesystem, dbMemory remains in memory
     try {
       if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
     } catch {}

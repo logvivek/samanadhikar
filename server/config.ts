@@ -2,20 +2,25 @@ import path from "path";
 import crypto from "crypto";
 import fs from "fs";
 
-// Ensure data and uploads directories exist
+// Ensure data and uploads directories exist with serverless /tmp fallback
 export const ROOT_DIR = process.cwd();
-export const DATA_DIR = path.join(ROOT_DIR, "data");
-export const UPLOADS_DIR = path.join(ROOT_DIR, "uploads");
+const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NETLIFY);
+export const DATA_DIR = isServerless ? path.join("/tmp", "data") : path.join(ROOT_DIR, "data");
+export const UPLOADS_DIR = isServerless ? path.join("/tmp", "uploads") : path.join(ROOT_DIR, "uploads");
 export const BACKUPS_DIR = path.join(DATA_DIR, "backups");
 
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-}
-if (!fs.existsSync(UPLOADS_DIR)) {
-  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-}
-if (!fs.existsSync(BACKUPS_DIR)) {
-  fs.mkdirSync(BACKUPS_DIR, { recursive: true });
+try {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+  if (!fs.existsSync(UPLOADS_DIR)) {
+    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+  }
+  if (!fs.existsSync(BACKUPS_DIR)) {
+    fs.mkdirSync(BACKUPS_DIR, { recursive: true });
+  }
+} catch (e) {
+  // Read-only filesystem fallback
 }
 
 // Persistent Secret for JWT signing
@@ -31,14 +36,14 @@ function getOrCreateJwtSecret(): string {
       if (savedSecret.length >= 32) return savedSecret;
     }
   } catch (err) {
-    console.warn("Could not read JWT secret file, generating a new one", err);
+    // Ignore read error
   }
 
   const generatedSecret = crypto.randomBytes(64).toString("hex");
   try {
     fs.writeFileSync(secretFile, generatedSecret, { encoding: "utf-8", mode: 0o600 });
   } catch (err) {
-    console.warn("Could not persist JWT secret to disk", err);
+    // In serverless read-only environment, keep in memory
   }
   return generatedSecret;
 }

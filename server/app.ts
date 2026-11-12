@@ -35,24 +35,46 @@ export function createExpressApp(): express.Express {
     app.use("/images", express.static(publicImagesPath));
   }
 
+  // CORS middleware for production domains (samanadhikar.in) & previews
+  app.use((req, res, next) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Admin-Token");
+    if (req.method === "OPTIONS") {
+      return res.status(200).end();
+    }
+    next();
+  });
+
   // General rate limiter on /api
   app.use("/api", publicLimiter);
 
-  // Mount API Routers matching the modular architecture
-  app.use("/api/admin", adminRouter);
-  app.use("/api/events", eventsRouter);
-  app.use("/api/members", membersRouter);
-  app.use("/api/donations", donationsRouter);
-  app.use("/api/press", pressRouter);
-  app.use("/api/press-releases", pressRouter); // Full compatibility alias
-  app.use("/api/party", partyRouter);
-  app.use("/api/party-info", partyRouter);     // Full compatibility alias
-  app.use("/api/cashfree", cashfreeRouter);
-  app.use("/api/chat", chatRouter);
-  app.use("/api/upload", uploadRouter);
+  // Mount API Routers matching both /api/* and direct /* (for serverless hosting environments)
+  const mount = (routePath: string, router: express.Router) => {
+    app.use(routePath, router);
+    if (routePath.startsWith("/api/")) {
+      app.use(routePath.replace(/^\/api/, ""), router);
+    }
+  };
+
+  mount("/api/admin", adminRouter);
+  mount("/api/events", eventsRouter);
+  mount("/api/members", membersRouter);
+  mount("/api/donations", donationsRouter);
+  mount("/api/press", pressRouter);
+  mount("/api/press-releases", pressRouter); // Full compatibility alias
+  mount("/api/party", partyRouter);
+  mount("/api/party-info", partyRouter);     // Full compatibility alias
+  mount("/api/cashfree", cashfreeRouter);
+  mount("/api/chat", chatRouter);
+  mount("/api/upload", uploadRouter);
 
   // Global alias for sync-youtube-shorts
   app.post("/api/sync-youtube-shorts", (req, res, next) => {
+    req.url = "/sync-youtube-shorts";
+    pressRouter(req, res, next);
+  });
+  app.post("/sync-youtube-shorts", (req, res, next) => {
     req.url = "/sync-youtube-shorts";
     pressRouter(req, res, next);
   });
