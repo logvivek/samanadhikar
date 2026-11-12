@@ -219,9 +219,13 @@ if ($action === 'cashfree_create_order' && $method === 'POST') {
     $orderId = 'order_sap_' . time() . '_' . rand(1000, 9999);
     $sessionId = 'session_cf_' . time() . '_' . substr(md5(uniqid()), 0, 8);
     $host = $_SERVER['HTTP_HOST'] ?? 'samanadhikar.in';
-    $proto = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-    $baseUrl = "$proto://$host";
-    $returnUrl = "$baseUrl/?order_id={order_id}&payment_status=cashfree_return";
+    $baseUrl = "https://$host";
+    
+    // return_url: maximum 250 characters, HTTPS, with {order_id} placeholder
+    $returnUrl = substr("$baseUrl/?order_id={order_id}&payment_status=cashfree_return", 0, 250);
+    // notify_url: maximum 250 characters, HTTPS endpoint
+    $notifyUrl = substr("$baseUrl/api/cashfree/webhook", 0, 250);
+
     $paymentUrl = "$baseUrl/cashfree-gateway?order_id=" . urlencode($orderId) . "&session_id=" . urlencode($sessionId) . "&amount=" . $orderAmount;
 
     json_response([
@@ -231,7 +235,9 @@ if ($action === 'cashfree_create_order' && $method === 'POST') {
         'orderAmount' => $orderAmount,
         'paymentUrl' => $paymentUrl,
         'returnUrl' => $returnUrl,
+        'notifyUrl' => $notifyUrl,
         'mode' => 'production',
+        'apiVersion' => '2026-01-01',
         'apiEndpoint' => 'https://api.cashfree.com/pg/orders'
     ]);
 }

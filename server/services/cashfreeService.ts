@@ -28,7 +28,9 @@ export function getCashfreeClient(): Cashfree | null {
   }
   const isProduction = CONFIG.CASHFREE.ENV !== "sandbox";
   const env = isProduction ? CFEnvironment.PRODUCTION : CFEnvironment.SANDBOX;
-  return new Cashfree(env, CONFIG.CASHFREE.APP_ID, CONFIG.CASHFREE.SECRET_KEY);
+  const client = new Cashfree(env, CONFIG.CASHFREE.APP_ID, CONFIG.CASHFREE.SECRET_KEY);
+  client.XApiVersion = CONFIG.CASHFREE.API_VERSION || "2026-01-01";
+  return client;
 }
 
 export async function createCashfreeOrder(params: CreateOrderParams) {
@@ -40,12 +42,31 @@ export async function createCashfreeOrder(params: CreateOrderParams) {
   const cleanEmail = (customerEmail && String(customerEmail).includes("@")) ? String(customerEmail).trim() : "donation@samanadhikarparty.org";
 
   // Clean absolute Base URL for Cashfree Return URL specification
-  const fallbackBase = process.env.APP_URL || "https://ais-dev-hj4se4pfjscomqdajpxts7-744727416675.asia-southeast1.run.app";
-  const baseUrl = (appUrl && appUrl.startsWith("http")) ? appUrl.replace(/\/$/, "") : fallbackBase.replace(/\/$/, "");
+  const fallbackBase = process.env.APP_URL 
+    || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://samanadhikar.in");
+  let rawBase = (appUrl && appUrl.startsWith("http")) ? appUrl.replace(/\/$/, "") : fallbackBase.replace(/\/$/, "");
   
-  // Return URL with dynamic {order_id} placeholder per Cashfree documentation
-  const returnUrl = `${baseUrl}/?order_id={order_id}&payment_status=cashfree_return`;
-  const notifyUrl = `${baseUrl}/api/cashfree/webhook`;
+  // Enforce HTTPS for Cashfree production endpoints (required by Cashfree gateway)
+  if (rawBase.startsWith("http://") && !rawBase.includes("localhost") && !rawBase.includes("127.0.0.1")) {
+    rawBase = rawBase.replace(/^http:\/\//, "https://");
+  }
+  const baseUrl = rawBase;
+  
+  // return_url: the page on your site where the customer lands after payment.
+  // Include the {order_id} placeholder so you can identify the order. Maximum length is 250 characters.
+  let returnUrl = `${baseUrl}/?order_id={order_id}&payment_status=cashfree_return`;
+  if (returnUrl.length > 250) {
+    returnUrl = `${baseUrl}/?order_id={order_id}`;
+  }
+  if (returnUrl.length > 250) {
+    returnUrl = returnUrl.substring(0, 250);
+  }
+
+  // notify_url: an HTTPS endpoint on your server for server-to-server notifications. Maximum length is 250 characters.
+  let notifyUrl = `${baseUrl}/api/cashfree/webhook`;
+  if (notifyUrl.length > 250) {
+    notifyUrl = notifyUrl.substring(0, 250);
+  }
 
   const orderPayload = {
     order_id: orderId,
@@ -64,15 +85,24 @@ export async function createCashfreeOrder(params: CreateOrderParams) {
     order_note: notes || `Saman Adhikar Party ${orderType === "MEMBERSHIP" ? "Membership Registration" : "Rashtra Nirman Contribution"}`
   };
 
-  // If live/sandbox credentials exist, call Cashfree official Server SDK (cashfree-pg)
-  // using production endpoint https://api.cashfree.com/pg/orders
-  const client = getCashfreeClient();
-  if (client) {
+  // If live/sandbox credentials exist, call Cashfree API with production endpoint and x-api-version: 2026-01-01
+  if (CONFIG.CASHFREE.APP_ID && CONFIG.CASHFREE.SECRET_KEY) {
+    const ordersEndpoint = CONFIG.CASHFREE.ORDERS_ENDPOINT || "https://api.cashfree.com/pg/orders";
     try {
-      const response = await client.PGCreateOrder(orderPayload);
-      const data = response.data;
+      const apiResponse = await fetch(ordersEndpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-version": "2026-01-01",
+          "x-client-id": CONFIG.CASHFREE.APP_ID,
+          "x-client-secret": CONFIG.CASHFREE.SECRET_KEY
+        },
+        body: JSON.stringify(orderPayload)
+      });
 
-      if (data && data.payment_session_id) {
+      const data: any = await apiResponse.json();
+
+      if (apiResponse.ok && data && data.payment_session_id) {
         const orderRecord: CashfreeOrderRecord = {
           orderId: data.order_id || orderId,
           paymentSessionId: data.payment_session_id,
@@ -103,19 +133,66 @@ export async function createCashfreeOrder(params: CreateOrderParams) {
           paymentUrl,
           returnUrl,
           mode: CONFIG.CASHFREE.ENV,
-          apiEndpoint: CONFIG.CASHFREE.ORDERS_ENDPOINT
+          apiVersion: "2026-01-01",
+          apiEndpoint: ordersEndpoint
         };
       }
 
-      console.error("Cashfree order creation error response from server SDK:", data);
+      console.error("Cashfree order creation error response from api.cashfree.com:", data);
       return {
         success: false,
-        error: (data as any)?.message || "कैशफ्री गेटवे पर आर्डर बनाने में त्रुटि हुई।",
+        error: data?.message || "कैशफ्री गेटवे पर आर्डर बनाने में त्रुटि हुई।",
         details: data
       };
     } catch (err: any) {
-      console.error("Cashfree Server SDK PGCreateOrder error:", err?.response?.data || err?.message || err);
-      // Fall through to simulated session so user can test the payment gateway redirect flow
+      console.error("Cashfree REST PGCreateOrder error:", err?.response?.data || err?.message || err);
+    }
+
+    // Fallback to Server SDK if direct fetch had a network error
+    const client = getCashfreeClient();
+    if (client) {
+      try {
+        const response = await client.PGCreateOrder(orderPayload);
+        const data = response.data;
+
+        if (data && data.payment_session_id) {
+          const orderRecord: CashfreeOrderRecord = {
+            orderId: data.order_id || orderId,
+            paymentSessionId: data.payment_session_id,
+            orderAmount: Number(orderAmount),
+            orderType: orderType || "DONATION",
+            orderStatus: "ACTIVE",
+            donorData: donorData || {
+              donorName: cleanName,
+              amount: Number(orderAmount),
+              phone: cleanPhone,
+              email: cleanEmail
+            },
+            memberData,
+            createdAt: new Date().toISOString()
+          };
+          await saveCashfreeOrder(orderRecord);
+
+          const isProduction = CONFIG.CASHFREE.ENV !== "sandbox";
+          const paymentUrl = isProduction
+            ? `https://payments.cashfree.com/order/#${data.payment_session_id}`
+            : `https://payments-test.cashfree.com/order/#${data.payment_session_id}`;
+
+          return {
+            success: true,
+            paymentSessionId: data.payment_session_id,
+            orderId: data.order_id || orderId,
+            orderAmount: data.order_amount || orderAmount,
+            paymentUrl,
+            returnUrl,
+            mode: CONFIG.CASHFREE.ENV,
+            apiVersion: "2026-01-01",
+            apiEndpoint: CONFIG.CASHFREE.ORDERS_ENDPOINT
+          };
+        }
+      } catch (sdkErr: any) {
+        console.error("Cashfree SDK fallback error:", sdkErr?.response?.data || sdkErr?.message || sdkErr);
+      }
     }
   }
 

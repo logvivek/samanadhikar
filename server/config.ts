@@ -66,7 +66,7 @@ export const CONFIG = {
       : "https://api.cashfree.com/pg/orders",
     APP_ID: process.env.CASHFREE_APP_ID || process.env.VITE_CASHFREE_APP_ID || "",
     SECRET_KEY: process.env.CASHFREE_SECRET_KEY || "",
-    API_VERSION: "2023-08-01",
+    API_VERSION: "2026-01-01",
     ENV: process.env.CASHFREE_ENV === "sandbox" ? "sandbox" : "production"
   },
 
