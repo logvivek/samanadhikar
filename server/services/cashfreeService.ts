@@ -46,24 +46,32 @@ export async function createCashfreeOrder(params: CreateOrderParams) {
     || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://samanadhikar.in");
   let rawBase = (appUrl && appUrl.startsWith("http")) ? appUrl.replace(/\/$/, "") : fallbackBase.replace(/\/$/, "");
   
-  // Enforce HTTPS for Cashfree production endpoints (required by Cashfree gateway)
-  if (rawBase.startsWith("http://") && !rawBase.includes("localhost") && !rawBase.includes("127.0.0.1")) {
-    rawBase = rawBase.replace(/^http:\/\//, "https://");
+  // Cashfree production/sandbox endpoint strictly requires HTTPS URLs for return_url and notify_url
+  let cfHost = "samanadhikar.in";
+  if (rawBase.startsWith("https://") && !rawBase.includes("localhost") && !rawBase.includes("127.0.0.1")) {
+    try {
+      const parsed = new URL(rawBase);
+      if (parsed.host && !parsed.host.includes("localhost") && !parsed.host.includes("127.0.0.1")) {
+        cfHost = parsed.host;
+      }
+    } catch {
+      cfHost = "samanadhikar.in";
+    }
   }
-  const baseUrl = rawBase;
-  
+  const httpsBase = `https://${cfHost}`;
+
   // return_url: the page on your site where the customer lands after payment.
   // Include the {order_id} placeholder so you can identify the order. Maximum length is 250 characters.
-  let returnUrl = `${baseUrl}/?order_id={order_id}&payment_status=cashfree_return`;
+  let returnUrl = `${httpsBase}/?order_id={order_id}&payment_status=cashfree_return`;
   if (returnUrl.length > 250) {
-    returnUrl = `${baseUrl}/?order_id={order_id}`;
+    returnUrl = `${httpsBase}/?order_id={order_id}`;
   }
   if (returnUrl.length > 250) {
     returnUrl = returnUrl.substring(0, 250);
   }
 
   // notify_url: an HTTPS endpoint on your server for server-to-server notifications. Maximum length is 250 characters.
-  let notifyUrl = `${baseUrl}/api/cashfree/webhook`;
+  let notifyUrl = `${httpsBase}/api/cashfree/webhook`;
   if (notifyUrl.length > 250) {
     notifyUrl = notifyUrl.substring(0, 250);
   }
