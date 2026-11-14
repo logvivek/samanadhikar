@@ -1,7 +1,3 @@
-import { getPartyInfo } from "../server/database/repositories/partyRepository";
-import { initDatabase } from "../server/database/connection";
-import { PARTY_INFO } from "../src/data/campaignData";
-
 export default async function handler(req: any, res: any) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
@@ -9,18 +5,19 @@ export default async function handler(req: any, res: any) {
 
   if (req.method === "OPTIONS") return res.status(200).end();
 
-  try {
-    initDatabase();
-    const partyInfo = await getPartyInfo();
-    return res.status(200).json({
-      success: true,
-      partyInfo: partyInfo || PARTY_INFO
-    });
-  } catch (err: any) {
-    console.error("Vercel party-info API error:", err);
-    return res.status(200).json({
-      success: true,
-      partyInfo: PARTY_INFO
-    });
-  }
+  return res.status(200).json({
+    success: true,
+    partyInfo: {
+      name: "समान अधिकार पार्टी",
+      nameEnglish: "Saman Adhikar Party",
+      leaderName: "कुलदीप शर्मा (Kuldeep Sharma)",
+      leaderRole: "राष्ट्रीय अध्यक्ष (National President)",
+      motto: "समान अधिकार लाना है, श्रेष्ठ भारत बनाना है!",
+      mottoEnglish: "Bring Equal Rights, Build a Supreme India!",
+      contactPhone1: "9412165541",
+      contactPhone2: "7310732088",
+      headquarters: "सदर बाजार, आगरा एवं मथुरा, उत्तर प्रदेश, भारत",
+      panNumber: "AAOAS8885L"
+    }
+  });
 }
