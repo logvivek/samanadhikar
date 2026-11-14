@@ -128,17 +128,54 @@ export interface JwtAdminPayload {
   exp?: number;
 }
 
+export type PaymentGatewayStatus =
+  | "PENDING"
+  | "SUCCESS"
+  | "FAILED"
+  | "USER_DROPPED"
+  | "CANCELLED";
+
+export interface PaymentTransactionRecord {
+  internalTransactionId: string;
+  cashfreeOrderId: string;
+  cashfreePaymentId: string | null;
+  paymentSessionId: string;
+  customerId: string;
+  customerName: string;
+  customerEmail: string;
+  customerMobile: string;
+  paymentAmount: number;
+  currency: "INR";
+  paymentStatus: PaymentGatewayStatus;
+  paymentMethod: string | null;
+  orderType: "DONATION" | "MEMBERSHIP";
+  membershipTier?: string;
+  failureReason?: string | null;
+  transactionDate: string | null;
+  createdDate: string;
+  updatedDate: string;
+  isSimulated?: boolean;
+  simulatedLockPending?: boolean;
+  idempotencyKey?: string;
+  processedWebhookEvents?: string[];
+  donorData?: any;
+  memberData?: any;
+  receipt?: any;
+  memberCard?: any;
+}
+
 export interface CashfreeOrderRecord {
   orderId: string;
   paymentSessionId: string;
   orderAmount: number;
   orderType: "DONATION" | "MEMBERSHIP";
-  orderStatus: "ACTIVE" | "PAID" | "FAILED" | "EXPIRED";
+  orderStatus: "ACTIVE" | "PAID" | "FAILED" | "EXPIRED" | "CANCELLED" | "USER_DROPPED";
   donorData?: any;
   memberData?: any;
   receipt?: any;
   memberCard?: any;
   transactionId?: string;
+  cashfreePaymentId?: string;
   paymentMethod?: string;
   createdAt: string;
   completedAt?: string;

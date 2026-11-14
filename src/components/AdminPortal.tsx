@@ -93,6 +93,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
   const [members, setMembers] = useState<any[]>([]);
   const [donations, setDonations] = useState<any[]>([]);
+  const [cashfreeTransactions, setCashfreeTransactions] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
   const [archivedEvents, setArchivedEvents] = useState<any[]>([]);
   const [activeEvtSubTab, setActiveEvtSubTab] = useState<"active" | "archive">("active");
@@ -289,6 +290,16 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
       const evtArchData = await evtArchRes.json();
       if (evtArchData.archivedEvents) setArchivedEvents(evtArchData.archivedEvents);
+
+      if (currentToken) {
+        try {
+          const cfRes = await fetch("/api/cashfree/transactions", { headers });
+          if (cfRes.ok) {
+            const cfData = await cfRes.json();
+            if (cfData.transactions) setCashfreeTransactions(cfData.transactions);
+          }
+        } catch {}
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -2159,6 +2170,83 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 ))}
               </tbody>
             </table>
+          </div>
+
+          {/* Cashfree Payment Gateway v3 Transaction Ledger */}
+          <div className="pt-4 border-t border-slate-100 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-black text-slate-900 flex items-center space-x-2">
+                  <ShieldCheck className="w-5 h-5 text-emerald-600" />
+                  <span>कैशफ्री पेमेंट गेटवे लेन-देन इतिहास (Cashfree PG v3 Transactions)</span>
+                </h3>
+                <p className="text-[11px] text-slate-500 font-medium">
+                  Order ID, Cashfree Payment ID, Customer, Status एवं Method का पूर्ण रिकॉर्ड
+                </p>
+              </div>
+              <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 font-mono font-bold text-xs">
+                Total: {cashfreeTransactions.length}
+              </span>
+            </div>
+
+            {cashfreeTransactions.length === 0 ? (
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-500 font-bold text-center">
+                अभी तक कोई कैशफ्री गेटवे लेन-देन दर्ज नहीं हुआ है।
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-100 text-slate-800 font-black border-b border-slate-200">
+                    <tr>
+                      <th className="p-2.5">Internal Txn / Order ID</th>
+                      <th className="p-2.5">CF Payment ID</th>
+                      <th className="p-2.5">Customer</th>
+                      <th className="p-2.5">Amount</th>
+                      <th className="p-2.5">Status</th>
+                      <th className="p-2.5">Method</th>
+                      <th className="p-2.5">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-medium">
+                    {cashfreeTransactions.map((tx) => (
+                      <tr key={tx.cashfreeOrderId} className="hover:bg-slate-50">
+                        <td className="p-2.5 font-mono text-[11px]">
+                          <div className="font-bold text-slate-900">{tx.internalTransactionId}</div>
+                          <div className="text-slate-500">{tx.cashfreeOrderId}</div>
+                        </td>
+                        <td className="p-2.5 font-mono text-[11px] text-slate-700">
+                          {tx.cashfreePaymentId || "-"}
+                        </td>
+                        <td className="p-2.5">
+                          <div className="font-bold text-slate-900">{tx.customerName}</div>
+                          <div className="text-[10px] text-slate-500">{tx.customerMobile} • {tx.customerEmail}</div>
+                        </td>
+                        <td className="p-2.5 font-black text-slate-900">
+                          ₹{Number(tx.paymentAmount || 0).toLocaleString("en-IN")} {tx.currency}
+                        </td>
+                        <td className="p-2.5">
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                              tx.paymentStatus === "SUCCESS"
+                                ? "bg-emerald-100 text-emerald-800"
+                                : tx.paymentStatus === "PENDING"
+                                  ? "bg-amber-100 text-amber-900"
+                                  : "bg-red-100 text-red-800"
+                            }`}
+                          >
+                            {tx.paymentStatus}
+                          </span>
+                        </td>
+                        <td className="p-2.5 text-slate-700">{tx.paymentMethod || "-"}</td>
+                        <td className="p-2.5 text-[11px] text-slate-500">
+                          {new Date(tx.transactionDate || tx.createdDate).toLocaleString("en-IN")}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       )}

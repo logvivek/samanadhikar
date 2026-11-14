@@ -314,6 +314,13 @@ export default function App() {
       {/* Cashfree Web Redirect Return Handler Modal */}
       <CashfreeReturnModal
         onDonationSuccess={handleDonationSuccess}
+        onRetryPayment={(type) => {
+          if (type === "MEMBERSHIP") {
+            setIsMemberModalOpen(true);
+          } else {
+            setIsDonateModalOpen(true);
+          }
+        }}
       />
 
     </div>

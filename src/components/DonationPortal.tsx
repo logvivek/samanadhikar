@@ -115,6 +115,7 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
   // 3. Donor Personal Details (ECI Compliant)
   const [donorName, setDonorName] = useState<string>("");
   const [phone, setPhone] = useState<string>("");
+  const [donorEmail, setDonorEmail] = useState<string>("");
   const [donorState, setDonorState] = useState<string>(INDIAN_STATES[0]);
   const [passportNumber, setPassportNumber] = useState<string>("");
   const [countryOfResidence, setCountryOfResidence] = useState<string>("United States");
@@ -289,7 +290,7 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
     }
   };
 
-  // === CASHFREE PG INTEGRATION (api.cashfree.com) ===
+  // === CASHFREE PG API v3 INTEGRATION ===
   const handlePayWithCashfree = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setFormError("");
@@ -305,8 +306,14 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
       return;
     }
 
-    if (!phone || phone.trim().length < 10) {
+    const cleanDigits = phone.replace(/\D/g, "");
+    if (!cleanDigits || cleanDigits.length < 10) {
       setFormError("कृपया अपना 10 अंकों का वैध मोबाइल नंबर दर्ज करें।");
+      return;
+    }
+
+    if (donorEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(donorEmail.trim())) {
+      setFormError("कृपया वैध ईमेल पता दर्ज करें (अथवा खाली छोड़ें)।");
       return;
     }
 
@@ -322,36 +329,46 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
 
     setIsCashfreeLoading(true);
     try {
+      const idempotencyKey = `cf_don_${cleanDigits.slice(-10)}_${amount}_${Date.now().toString().slice(-6)}`;
       const donorData = {
-        donorName: isAnonymous ? "गुप्त राष्ट्रभक्त (Anonymous Patriot)" : (donorName || "समर्थक नागरिक"),
+        donorName: isAnonymous ? "गुप्त राष्ट्रभक्त (Anonymous Patriot)" : (donorName.trim() || "समर्थक नागरिक"),
         amount,
         frequency,
         precinct: donorState || "राष्ट्रीय मुख्यालय",
         isAnonymous,
-        message: message || "Cashfree Web Redirect Contribution",
+        message: message || "Cashfree PG v3 Contribution",
         citizenship,
-        phone,
+        phone: cleanDigits.slice(-10),
+        email: donorEmail.trim() || undefined,
         donorState,
         passportNumber: citizenship === "NRI" ? passportNumber : undefined
       };
 
-      // 1. Create order on server (connecting to api.cashfree.com/pg/orders)
+      // 1. Create order on server via Cashfree PG v3 backend endpoint
       const res = await fetch("/api/cashfree/create-order", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-Idempotency-Key": idempotencyKey
+        },
         body: JSON.stringify({
           orderAmount: amount,
-          customerName: isAnonymous ? "गुप्त राष्ट्रभक्त" : (donorName || "समर्थक नागरिक"),
-          customerPhone: phone,
+          customerName: isAnonymous ? "गुप्त राष्ट्रभक्त" : (donorName.trim() || "समर्थक नागरिक"),
+          customerPhone: cleanDigits.slice(-10),
+          customerEmail: donorEmail.trim() || undefined,
           orderType: "DONATION",
-          notes: `Saman Adhikar Party Contribution - ₹${amount}`,
+          notes: `Saman Adhikar Party Contribution - INR ${amount}`,
+          idempotencyKey,
           donorData
         })
       });
 
-      const orderData = await res.json();
+      const orderData = await res.json().catch(() => ({
+        success: false,
+        error: `सर्वर त्रुटि (${res.status})। कृपया पुनः प्रयास करें।`
+      }));
 
-      if (!orderData.success || !orderData.paymentSessionId) {
+      if (!res.ok || !orderData.success || !orderData.paymentSessionId) {
         setPaymentError(orderData.error || "कैशफ्री गेटवे सत्र बनाने में समस्या आई।");
         setIsCashfreeLoading(false);
         return;
@@ -360,58 +377,47 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
       setCashfreeOrderId(orderData.orderId);
       setCashfreeSessionId(orderData.paymentSessionId);
 
-      // 2. Perform Web Redirection to Cashfree Payment Gateway Page
-      // Per Cashfree documentation https://www.cashfree.com/docs/payments/online/web/redirect
-      const targetUrl = orderData.paymentUrl || (
-        orderData.mode === "production"
+      const sdkMode = orderData.mode === "production" ? "production" : "sandbox";
+      const fallbackUrl =
+        orderData.paymentUrl ||
+        (sdkMode === "production"
           ? `https://payments.cashfree.com/order/#${orderData.paymentSessionId}`
-          : `https://payments-test.cashfree.com/order/#${orderData.paymentSessionId}`
-      );
+          : `https://payments-test.cashfree.com/order/#${orderData.paymentSessionId}`);
 
-      // If simulated or paymentUrl provided, immediately redirect browser to payment gateway page
-      if (orderData.isSimulated || orderData.paymentUrl) {
-        window.location.href = targetUrl;
+      // 2. If running in local sandbox simulator mode (no live/sandbox keys configured), navigate to simulator page
+      if (orderData.isSimulated && orderData.paymentUrl) {
+        window.location.assign(orderData.paymentUrl);
         return;
       }
 
-      // 3. For live Cashfree credentials, trigger Cashfree Web Redirect Checkout
+      // 3. Official Cashfree JavaScript SDK v3 Checkout using backend-generated paymentSessionId
       try {
         let cashfree: any = null;
         if (typeof window !== "undefined" && typeof (window as any).Cashfree === "function") {
-          cashfree = (window as any).Cashfree({
-            mode: orderData.mode === "production" ? "production" : "sandbox"
-          });
+          cashfree = (window as any).Cashfree({ mode: sdkMode });
         } else {
-          cashfree = await loadCashfree({
-            mode: orderData.mode === "production" ? "production" : "sandbox"
-          });
+          cashfree = await loadCashfree({ mode: sdkMode });
         }
 
         if (cashfree && typeof cashfree.checkout === "function") {
-          const checkoutOptions = {
+          const result = await cashfree.checkout({
             paymentSessionId: orderData.paymentSessionId,
-            redirectTarget: "_self" // Standard Cashfree Web Redirect flow per document
-          };
-
-          cashfree.checkout(checkoutOptions).then(async (result: any) => {
-            if (result && result.error) {
-              console.warn("Cashfree checkout error, redirecting directly to hosted page:", result.error);
-              window.location.href = targetUrl;
-            }
-          }).catch((err: any) => {
-            console.warn("Cashfree checkout execution error, redirecting directly:", err);
-            window.location.href = targetUrl;
+            redirectTarget: "_self"
           });
+          if (result && result.error) {
+            console.warn("Cashfree SDK checkout returned error:", result.error);
+            window.location.assign(fallbackUrl);
+          }
         } else {
-          window.location.href = targetUrl;
+          window.location.assign(fallbackUrl);
         }
       } catch (sdkErr) {
-        console.warn("Cashfree SDK init error, fallback direct redirect:", sdkErr);
-        window.location.href = targetUrl;
+        console.warn("Cashfree JS SDK fallback redirect:", sdkErr);
+        window.location.assign(fallbackUrl);
       }
     } catch (err) {
       console.error("Cashfree init error:", err);
-      setPaymentError("कैशफ्री गेटवे (api.cashfree.com) से संपर्क में त्रुटि। कृपया पुनः प्रयास करें।");
+      setPaymentError("कैशफ्री गेटवे से संपर्क में त्रुटि। कृपया पुनः प्रयास करें।");
     } finally {
       setIsCashfreeLoading(false);
     }
@@ -840,6 +846,17 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
                 </div>
 
                 <div>
+                  <label className="block text-slate-700 mb-1">ईमेल पता (Email - रसीद हेतु):</label>
+                  <input
+                    type="email"
+                    placeholder="name@example.com"
+                    value={donorEmail}
+                    onChange={(e) => setDonorEmail(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none transition-all"
+                  />
+                </div>
+
+                <div>
                   <label className="block text-slate-700 mb-1">राज्य / प्रदेश (State / Region):</label>
                   <select
                     value={donorState}
@@ -912,15 +929,15 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
               </div>
             </div>
 
-            {/* Form Error Notice */}
-            {formError && (
+            {/* Form & Payment Error Notice */}
+            {(formError || paymentError) && (
               <div className="p-3.5 bg-red-50 border border-red-300 text-red-700 rounded-xl text-xs font-bold flex items-center space-x-2">
                 <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{formError}</span>
+                <span>{formError || paymentError}</span>
               </div>
             )}
 
-            {/* Proceed to Payment Button (api.cashfree.com Integration) */}
+            {/* Proceed to Payment Button (Cashfree PG v3) */}
             <div className="pt-4 space-y-3">
               <button
                 type="button"
@@ -931,12 +948,12 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
                 {isCashfreeLoading ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin text-white" />
-                    <span>कैशफ्री गेटवे से कनेक्ट हो रहा है (api.cashfree.com)...</span>
+                    <span>कैशफ्री गेटवे से कनेक्ट हो रहा है (Connecting to Cashfree)...</span>
                   </>
                 ) : (
                   <>
                     <ShieldCheck className="w-5 h-5 text-orange-200" />
-                    <span>Pay ₹{amount.toLocaleString("en-IN")} via Cashfree Gateway (api.cashfree.com)</span>
+                    <span>Pay ₹{amount.toLocaleString("en-IN")} Now via Cashfree Gateway</span>
                     <ArrowRight className="w-5 h-5" />
                   </>
                 )}
@@ -956,7 +973,7 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
 
                 <div className="flex items-center space-x-1.5 text-[11px] font-bold text-slate-500">
                   <Lock className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span>256-Bit SSL • api.cashfree.com/pg/orders</span>
+                  <span>256-Bit SSL • Cashfree PG API v3</span>
                 </div>
               </div>
             </div>

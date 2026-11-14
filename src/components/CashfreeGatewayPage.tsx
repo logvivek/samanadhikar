@@ -28,6 +28,7 @@ const POPULAR_BANKS = [
 
 export const CashfreeGatewayPage: React.FC = () => {
   const [orderId, setOrderId] = useState<string>("");
+  const [internalTxId, setInternalTxId] = useState<string>("");
   const [sessionId, setSessionId] = useState<string>("");
   const [amount, setAmount] = useState<number>(500);
   const [customerName, setCustomerName] = useState<string>("समर्थक नागरिक");
@@ -59,6 +60,7 @@ export const CashfreeGatewayPage: React.FC = () => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     const qOrderId = params.get("order_id");
+    const qTxId = params.get("tx_id");
     const qSessionId = params.get("session_id");
     const qAmount = params.get("amount");
     const qName = params.get("name");
@@ -68,6 +70,7 @@ export const CashfreeGatewayPage: React.FC = () => {
     if (qOrderId) setOrderId(qOrderId);
     else setOrderId(`order_sap_${Date.now()}`);
 
+    if (qTxId) setInternalTxId(qTxId);
     if (qSessionId) setSessionId(qSessionId);
     if (qAmount && !isNaN(Number(qAmount))) setAmount(Number(qAmount));
     if (qName) setCustomerName(decodeURIComponent(qName));
@@ -89,27 +92,29 @@ export const CashfreeGatewayPage: React.FC = () => {
     setCardExpiry(val);
   };
 
-  const handlePay = async () => {
+  const handlePay = async (simulatedOutcome: "SUCCESS" | "FAILED" | "PENDING" | "USER_DROPPED" | "CANCELLED" = "SUCCESS") => {
     setErrorMessage("");
 
-    // Validate inputs
-    if (paymentTab === "card") {
-      const cleanCard = cardNumber.replace(/\s+/g, "");
-      if (cleanCard.length < 15) {
-        setErrorMessage("कृपया 16 अंकों का मान्य कार्ड नंबर दर्ज करें।");
+    // Validate inputs only on normal Pay Now flow
+    if (simulatedOutcome === "SUCCESS") {
+      if (paymentTab === "card") {
+        const cleanCard = cardNumber.replace(/\s+/g, "");
+        if (cleanCard.length < 15) {
+          setErrorMessage("कृपया 16 अंकों का मान्य कार्ड नंबर दर्ज करें।");
+          return;
+        }
+        if (!cardExpiry || !cardExpiry.includes("/")) {
+          setErrorMessage("कृपया मान्य समाप्ति तिथि (MM/YY) दर्ज करें।");
+          return;
+        }
+        if (!cardCvv || cardCvv.length < 3) {
+          setErrorMessage("कृपया 3 अंकों का CVV नंबर दर्ज करें।");
+          return;
+        }
+      } else if (paymentTab === "upi" && upiId && !upiId.includes("@")) {
+        setErrorMessage("कृपया मान्य UPI ID दर्ज करें (उदा. username@bank)।");
         return;
       }
-      if (!cardExpiry || !cardExpiry.includes("/")) {
-        setErrorMessage("कृपया मान्य समाप्ति तिथि (MM/YY) दर्ज करें।");
-        return;
-      }
-      if (!cardCvv || cardCvv.length < 3) {
-        setErrorMessage("कृपया 3 अंकों का CVV नंबर दर्ज करें।");
-        return;
-      }
-    } else if (paymentTab === "upi" && upiId && !upiId.includes("@")) {
-      setErrorMessage("कृपया मान्य UPI ID दर्ज करें (उदा. username@bank)।");
-      return;
     }
 
     setIsProcessing(true);
@@ -118,20 +123,20 @@ export const CashfreeGatewayPage: React.FC = () => {
     try {
       let methodLabel = "Cashfree Hosted Checkout";
       if (paymentTab === "upi") {
-        methodLabel = upiId ? `Cashfree UPI (${upiId})` : `Cashfree UPI (${selectedUpiApp.toUpperCase()})`;
+        methodLabel = upiId ? `UPI (${upiId})` : `UPI (${selectedUpiApp.toUpperCase()})`;
       } else if (paymentTab === "card") {
-        methodLabel = `Cashfree Card (Ending in ${cardNumber.slice(-4) || "XXXX"})`;
+        methodLabel = `CARD (Ending in ${cardNumber.slice(-4) || "XXXX"})`;
       } else if (paymentTab === "netbanking") {
-        methodLabel = `Cashfree NetBanking (${selectedBank})`;
+        methodLabel = `NETBANKING (${selectedBank})`;
       } else if (paymentTab === "wallet") {
-        methodLabel = `Cashfree Wallet (${selectedWallet.toUpperCase()})`;
+        methodLabel = `WALLET (${selectedWallet.toUpperCase()})`;
       }
 
-      await new Promise((r) => setTimeout(r, 600));
-      setProcessingStep("बैंक गेटवे द्वारा भुगतान अधिकृत किया जा रहा है (Authorizing Payment)...");
-      await new Promise((r) => setTimeout(r, 700));
+      await new Promise((r) => setTimeout(r, 400));
+      setProcessingStep("बैंक गेटवे द्वारा भुगतान सत्यापित किया जा रहा है (Authorizing)...");
+      await new Promise((r) => setTimeout(r, 400));
 
-      // Call verification API to complete order and generate tax receipt
+      // Call server-side verification API to record status safely
       const res = await fetch("/api/cashfree/verify-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -139,6 +144,7 @@ export const CashfreeGatewayPage: React.FC = () => {
           orderId,
           paymentSessionId: sessionId,
           paymentMethod: methodLabel,
+          simulatedOutcome,
           donorData: {
             donorName: customerName,
             amount,
@@ -152,18 +158,12 @@ export const CashfreeGatewayPage: React.FC = () => {
         })
       });
 
-      const data = await res.json();
+      await res.json().catch(() => ({}));
+      setProcessingStep("मुख्य पृष्ठ पर रसीद/स्थिति सत्यापन हेतु पुनः निर्देशित किया जा रहा है...");
+      await new Promise((r) => setTimeout(r, 300));
 
-      if (data.success) {
-        setProcessingStep("भुगतान स्वीकृत! मुख्य पृष्ठ पर 80GGC रसीद हेतु पुनः निर्देशित किया जा रहा है...");
-        await new Promise((r) => setTimeout(r, 600));
-        
-        // Redirect to standard Return URL per Cashfree integration docs
-        window.location.href = `/?order_id=${encodeURIComponent(orderId)}&payment_status=cashfree_return`;
-      } else {
-        setErrorMessage(data.error || "भुगतान प्रक्रिया में समस्या आई।");
-        setIsProcessing(false);
-      }
+      // Redirect to Return URL with {order_id} so CashfreeReturnModal verifies state server-side
+      window.location.href = `/?order_id=${encodeURIComponent(orderId)}&payment_status=cashfree_return`;
     } catch (err) {
       console.error("Payment error:", err);
       setErrorMessage("कैशफ्री सर्वर से संपर्क में समस्या आई। पुनः प्रयास करें।");
@@ -171,8 +171,8 @@ export const CashfreeGatewayPage: React.FC = () => {
     }
   };
 
-  const handleCancel = () => {
-    window.location.href = `/?payment_status=cancelled`;
+  const handleCancel = async () => {
+    await handlePay("CANCELLED");
   };
 
   return (
@@ -226,9 +226,14 @@ export const CashfreeGatewayPage: React.FC = () => {
             <div className="text-2xl sm:text-3xl font-black text-emerald-700">
               ₹{amount.toLocaleString("en-IN")}
             </div>
-            <span className="text-[10px] font-bold text-slate-500 font-mono">
+            <span className="text-[10px] font-bold text-slate-500 font-mono block">
               Order: {orderId}
             </span>
+            {internalTxId && (
+              <span className="text-[10px] font-bold text-sky-700 font-mono block">
+                Txn: {internalTxId}
+              </span>
+            )}
           </div>
         </div>
 
@@ -512,7 +517,7 @@ export const CashfreeGatewayPage: React.FC = () => {
             <button
               type="button"
               disabled={isProcessing}
-              onClick={handlePay}
+              onClick={() => handlePay("SUCCESS")}
               className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-sky-600 via-indigo-600 to-sky-700 hover:from-sky-700 hover:to-indigo-700 text-white font-black text-base shadow-xl flex items-center justify-center space-x-2.5 cursor-pointer transition-all active:scale-[0.99] disabled:opacity-75"
             >
               {isProcessing ? (
@@ -527,6 +532,47 @@ export const CashfreeGatewayPage: React.FC = () => {
                 </>
               )}
             </button>
+
+            {/* Sandbox Lifecycle Test Controls */}
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 block">
+                Sandbox Test Outcomes (सैंडबॉक्स परीक्षण विकल्प):
+              </span>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <button
+                  type="button"
+                  disabled={isProcessing}
+                  onClick={() => handlePay("FAILED")}
+                  className="py-2 px-2.5 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-800 font-bold text-[11px] cursor-pointer transition-all disabled:opacity-50"
+                >
+                  Simulate Failed
+                </button>
+                <button
+                  type="button"
+                  disabled={isProcessing}
+                  onClick={() => handlePay("PENDING")}
+                  className="py-2 px-2.5 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold text-[11px] cursor-pointer transition-all disabled:opacity-50"
+                >
+                  Simulate Pending
+                </button>
+                <button
+                  type="button"
+                  disabled={isProcessing}
+                  onClick={() => handlePay("USER_DROPPED")}
+                  className="py-2 px-2.5 rounded-xl border border-orange-200 bg-orange-50 hover:bg-orange-100 text-orange-900 font-bold text-[11px] cursor-pointer transition-all disabled:opacity-50"
+                >
+                  Simulate User Dropped
+                </button>
+                <button
+                  type="button"
+                  disabled={isProcessing}
+                  onClick={handleCancel}
+                  className="py-2 px-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 font-bold text-[11px] cursor-pointer transition-all disabled:opacity-50"
+                >
+                  Simulate Cancelled
+                </button>
+              </div>
+            </div>
 
             <div className="flex items-center justify-between text-xs font-bold text-slate-500 pt-1">
               <button

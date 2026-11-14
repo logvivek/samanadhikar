@@ -19,9 +19,13 @@ export function createExpressApp(): express.Express {
   // Trust proxy for container & reverse proxy environments (e.g. Cloud Run, Nginx)
   app.set("trust proxy", 1);
 
-  // Lightweight body parser limits: Prevents large Base64 payloads from hogging memory.
-  // Large files must be uploaded via streaming multipart form-data to /api/upload instead.
-  app.use(express.json({ limit: "500kb" }));
+  // Lightweight body parser limits + capture rawBody for Cashfree webhook signature verification
+  app.use(express.json({
+    limit: "500kb",
+    verify: (req: any, _res, buf) => {
+      req.rawBody = buf.toString("utf8");
+    }
+  }));
   app.use(express.urlencoded({ extended: true, limit: "500kb" }));
 
   // Static uploads directory serving

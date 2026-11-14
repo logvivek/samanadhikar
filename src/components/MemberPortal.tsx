@@ -362,11 +362,14 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
     setIsCashfreeLoading(true);
 
     try {
+      const cleanPhone = phone.replace(/\D/g, "").slice(-10);
+      const idempotencyKey = `cf_mem_${cleanPhone}_${membershipFee}_${Date.now().toString().slice(-6)}`;
       const memberData = {
         fullName: fullName.trim(),
-        phone: phone.trim(),
+        phone: cleanPhone,
         precinct,
         membershipTier,
+        isCustomFee,
         interests: ["समान अधिकार अभियान"],
         membershipFee,
         isFeePaid: true
@@ -374,64 +377,69 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
 
       const res = await fetch("/api/cashfree/create-order", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-Idempotency-Key": idempotencyKey
+        },
         body: JSON.stringify({
           orderAmount: membershipFee,
           customerName: fullName.trim(),
-          customerPhone: phone.trim(),
+          customerPhone: cleanPhone,
           orderType: "MEMBERSHIP",
-          notes: `SAP Membership - ${membershipTier} (₹${membershipFee})`,
+          notes: `SAP Membership - ${membershipTier} (INR ${membershipFee})`,
+          idempotencyKey,
           memberData
         })
       });
 
-      const orderData = await res.json();
-      if (!orderData.success || !orderData.paymentSessionId) {
+      const orderData = await res.json().catch(() => ({
+        success: false,
+        error: `सर्वर त्रुटि (${res.status})।`
+      }));
+
+      if (!res.ok || !orderData.success || !orderData.paymentSessionId) {
         setPaymentError(orderData.error || "कैशफ्री गेटवे सत्र बनाने में समस्या आई।");
         setIsCashfreeLoading(false);
         return;
       }
 
-      // 2. Perform Web Redirection to Cashfree Payment Gateway Page
-      const targetUrl = orderData.paymentUrl || (
-        orderData.mode === "production"
+      const sdkMode = orderData.mode === "production" ? "production" : "sandbox";
+      const fallbackUrl =
+        orderData.paymentUrl ||
+        (sdkMode === "production"
           ? `https://payments.cashfree.com/order/#${orderData.paymentSessionId}`
-          : `https://payments-test.cashfree.com/order/#${orderData.paymentSessionId}`
-      );
+          : `https://payments-test.cashfree.com/order/#${orderData.paymentSessionId}`);
 
-      // If simulated or paymentUrl provided, immediately redirect browser to payment gateway page
-      if (orderData.isSimulated || orderData.paymentUrl) {
-        window.location.href = targetUrl;
+      // If running in local sandbox simulator mode (no merchant keys configured), navigate to simulator page
+      if (orderData.isSimulated && orderData.paymentUrl) {
+        window.location.assign(orderData.paymentUrl);
         return;
       }
 
-      // 3. For live Cashfree credentials, trigger Cashfree Web Redirect Checkout
+      // Launch Official Cashfree JS SDK v3 Checkout using backend paymentSessionId
       try {
         let cashfree: any = null;
         if (typeof window !== "undefined" && typeof (window as any).Cashfree === "function") {
-          cashfree = (window as any).Cashfree({
-            mode: orderData.mode === "production" ? "production" : "sandbox"
-          });
+          cashfree = (window as any).Cashfree({ mode: sdkMode });
         } else {
-          cashfree = await loadCashfree({
-            mode: orderData.mode === "production" ? "production" : "sandbox"
-          });
+          cashfree = await loadCashfree({ mode: sdkMode });
         }
 
         if (cashfree && typeof cashfree.checkout === "function") {
-          cashfree.checkout({
+          const result = await cashfree.checkout({
             paymentSessionId: orderData.paymentSessionId,
-            redirectTarget: "_self" // Standard Web Redirect
-          }).catch((err: any) => {
-            console.warn("Cashfree checkout error, fallback to direct redirect:", err);
-            window.location.href = targetUrl;
+            redirectTarget: "_self"
           });
+          if (result && result.error) {
+            console.warn("Cashfree checkout returned error:", result.error);
+            window.location.assign(fallbackUrl);
+          }
         } else {
-          window.location.href = targetUrl;
+          window.location.assign(fallbackUrl);
         }
       } catch (sdkErr) {
-        console.warn("Cashfree JS SDK error, redirecting directly:", sdkErr);
-        window.location.href = targetUrl;
+        console.warn("Cashfree JS SDK fallback redirect:", sdkErr);
+        window.location.assign(fallbackUrl);
       }
     } catch (err) {
       console.error(err);
@@ -672,6 +680,12 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
                       </>
                     )}
                   </button>
+                  {paymentError && (
+                    <div className="p-2.5 bg-red-50 border border-red-300 text-red-700 rounded-xl text-xs font-bold flex items-center space-x-2">
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                      <span>{paymentError}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="text-center">
