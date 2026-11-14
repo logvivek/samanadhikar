@@ -3,6 +3,9 @@ import paymentQrImg from "../assets/images/payment_upi_qr.jpg";
 import { PRECINCTS_LIST, PARTY_INFO, INDIAN_STATES } from "../data/campaignData";
 import { MemberRecord } from "../types";
 import { validateUtrNumber } from "../utils/utrValidation";
+import { MemberIdCard } from "./MemberIdCard";
+import { GoogleDriveMemberSync } from "./GoogleDriveMemberSync";
+import { memberToExcelRow } from "../utils/googleDriveMemberSync";
 import { 
   Users, 
   UserPlus, 
@@ -945,69 +948,61 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
                 <Award className="w-4 h-4 text-orange-600" />
               </div>
 
-              {/* ID Card */}
-              <div className="bg-gradient-to-br from-orange-600 via-amber-600 to-orange-700 rounded-2xl p-6 text-white space-y-5 shadow-xl relative overflow-hidden">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <div className="flex items-center space-x-1.5">
-                      <Flame className="w-4 h-4 text-orange-200 fill-orange-200" />
-                      <span className="text-xs font-black tracking-wider text-white">
-                        {PARTY_INFO.name}
+              {activeMemberCard ? (
+                <div className="space-y-4">
+                  <MemberIdCard member={activeMemberCard} showActions={true} />
+                  <GoogleDriveMemberSync
+                    rows={[memberToExcelRow(activeMemberCard)]}
+                    compact={true}
+                    title="Google Drive में सदस्य रिकॉर्ड सेव करें (member.xlsx)"
+                    description="MemberName, Mobilenumber, District, MemAmt, Date विवरण को Google Drive Excel फ़ाइल में सुरक्षित करें।"
+                  />
+                </div>
+              ) : (
+                /* Live Draft ID Card Preview before payment */
+                <div className="bg-gradient-to-br from-orange-600 via-amber-600 to-orange-700 rounded-2xl p-6 text-white space-y-5 shadow-xl relative overflow-hidden">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <div className="flex items-center space-x-1.5">
+                        <Flame className="w-4 h-4 text-orange-200 fill-orange-200" />
+                        <span className="text-xs font-black tracking-wider text-white">
+                          {PARTY_INFO.name}
+                        </span>
+                      </div>
+                      <span className="text-[9px] font-black text-orange-100 block uppercase tracking-widest mt-1">
+                        आधिकारिक सदस्यता पहचान पत्र (पूर्वावलोकन)
                       </span>
                     </div>
-                    <span className="text-[9px] font-black text-orange-100 block uppercase tracking-widest mt-1">
-                      आधिकारिक सदस्यता पहचान पत्र
-                    </span>
+                    <QrCode className="w-10 h-10 text-orange-950 bg-white p-1 rounded-lg shadow-sm" />
                   </div>
-                  <QrCode className="w-10 h-10 text-orange-950 bg-white p-1 rounded-lg shadow-sm" />
-                </div>
 
-                <div className="space-y-1">
-                  <div className="text-xl font-black tracking-tight">
-                    {activeMemberCard ? activeMemberCard.fullName : (fullName || "आपका नाम")}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="px-2.5 py-0.5 rounded-full bg-white text-orange-950 text-xs font-black">
-                      {activeMemberCard ? activeMemberCard.membershipTier : membershipTier}
-                    </span>
-                    {activeMemberCard?.isFeePaid && (
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-800 text-emerald-100 text-[10px] font-black">
-                        ✓ सत्यापित
+                  <div className="space-y-1">
+                    <div className="text-xl font-black tracking-tight">
+                      {fullName || "आपका नाम"}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="px-2.5 py-0.5 rounded-full bg-white text-orange-950 text-xs font-black">
+                        {membershipTier}
                       </span>
-                    )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs font-mono border-t border-white/30 pt-3">
+                    <div>
+                      <span className="text-orange-200 block text-[10px]">जिला / मंडल:</span>
+                      <span className="font-extrabold truncate block">{precinct}</span>
+                    </div>
+                    <div>
+                      <span className="text-orange-200 block text-[10px]">कार्ड ID:</span>
+                      <span className="font-black">SAP-2026-XXXX</span>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-white/30 flex items-center justify-between text-[10px] text-orange-100">
+                    <span>हस्ताक्षर: कुलदीप शर्मा (राष्ट्रीय अध्यक्ष)</span>
+                    <span className="font-black">समान अधिकार पार्टी</span>
                   </div>
                 </div>
-
-                <div className="grid grid-cols-2 gap-2 text-xs font-mono border-t border-white/30 pt-3">
-                  <div>
-                    <span className="text-orange-200 block text-[10px]">जिला / मंडल:</span>
-                    <span className="font-extrabold truncate block">
-                      {activeMemberCard ? activeMemberCard.precinct : precinct}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-orange-200 block text-[10px]">कार्ड ID:</span>
-                    <span className="font-black">
-                      {activeMemberCard ? activeMemberCard.memberCardId : "SAP-2026-XXXX"}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="pt-2 border-t border-white/30 flex items-center justify-between text-[10px] text-orange-100">
-                  <span>हस्ताक्षर: कुलदीप शर्मा (राष्ट्रीय अध्यक्ष)</span>
-                  <span className="font-black">समान अधिकार पार्टी</span>
-                </div>
-              </div>
-
-              {activeMemberCard && (
-                <button
-                  type="button"
-                  onClick={() => window.print()}
-                  className="w-full py-3 rounded-xl bg-slate-900 hover:bg-black text-white font-bold text-xs flex items-center justify-center space-x-1.5 cursor-pointer shadow"
-                >
-                  <Printer className="w-4 h-4 text-orange-400" />
-                  <span>डिजिटल सदस्यता कार्ड प्रिंट करें</span>
-                </button>
               )}
 
             </div>

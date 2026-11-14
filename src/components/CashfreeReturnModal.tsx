@@ -14,6 +14,9 @@ import {
 } from "lucide-react";
 import { PARTY_INFO } from "../data/campaignData";
 import { DonationReceipt, MemberRecord } from "../types";
+import { MemberIdCard } from "./MemberIdCard";
+import { GoogleDriveMemberSync } from "./GoogleDriveMemberSync";
+import { memberToExcelRow } from "../utils/googleDriveMemberSync";
 
 type VerifiedScreenStatus =
   | "VERIFYING"
@@ -279,65 +282,44 @@ export const CashfreeReturnModal: React.FC<CashfreeReturnModalProps> = ({
             </div>
           )}
 
-          {/* SUCCESS: Member Registration Card */}
+          {/* SUCCESS: Member Registration Card + PDF Download + Google Drive Excel Sync */}
           {status === "SUCCESS" && member && !receipt && (
-            <div className="space-y-6">
-              <div className="text-center space-y-2">
-                <div className="w-14 h-14 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto shadow-sm">
-                  <UserCheck className="w-8 h-8" />
+            <div className="space-y-5">
+              <div className="text-center space-y-1.5 no-print">
+                <div className="w-12 h-12 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto shadow-sm">
+                  <UserCheck className="w-7 h-7" />
                 </div>
                 <h3 className="text-xl font-black text-emerald-950">
                   सदस्यता पंजीकरण व भुगतान सफल!
                 </h3>
                 <p className="text-xs text-slate-600 font-bold">
-                  समान अधिकार पार्टी परिवार में आपका हार्दिक स्वागत है।
+                  समान अधिकार पार्टी परिवार में आपका हार्दिक स्वागत है। नीचे अपना डिजिटल सदस्य कार्ड प्रिंट या PDF डाउनलोड करें।
                 </p>
               </div>
 
-              <div className="border-2 border-orange-500 rounded-2xl p-5 bg-gradient-to-r from-orange-50 via-white to-amber-50 space-y-3 shadow-md text-xs">
-                <div className="flex items-center justify-between border-b border-orange-200 pb-2">
-                  <span className="font-black text-orange-950 text-sm">समान अधिकार पार्टी • डिजिटल सदस्य कार्ड</span>
-                  <span className="px-2 py-0.5 bg-orange-600 text-white font-black text-[10px] rounded-full">
-                    {member.membershipTier}
-                  </span>
-                </div>
+              <MemberIdCard
+                member={member}
+                orderId={orderId}
+                transactionId={internalTransactionId}
+                showActions={true}
+              />
 
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div>
-                    <span className="text-[10px] text-slate-500 block uppercase">नाम (Full Name)</span>
-                    <span className="font-black text-slate-900">{member.fullName}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-500 block uppercase">कार्ड संख्या (Member Card ID)</span>
-                    <span className="font-mono font-black text-orange-700">{member.memberCardId}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-500 block uppercase">Transaction & Order ID</span>
-                    <span className="font-mono font-bold text-slate-900 block truncate">{internalTransactionId || member.utrNumber}</span>
-                    <span className="font-mono text-[10px] text-slate-500 block truncate">{orderId}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-500 block uppercase">सत्यापन स्थिति</span>
-                    <span className="font-black text-emerald-700">सक्रिय एवं सत्यापित (SUCCESS)</span>
-                  </div>
-                </div>
+              <div className="no-print">
+                <GoogleDriveMemberSync
+                  rows={[memberToExcelRow(member)]}
+                  compact={true}
+                  title="सदस्यता भुगतान को Google Drive (member.xlsx) में सेव करें"
+                  description="सफल भुगतान का विवरण (MemberName, Mobilenumber, District, MemAmt, Date) सीधे Google Drive Excel फ़ाइल में जोड़ें और लिंक प्राप्त करें।"
+                />
               </div>
 
-              <div className="flex justify-center gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={handlePrint}
-                  className="px-4 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-black text-xs flex items-center space-x-2 cursor-pointer shadow-md transition-all"
-                >
-                  <Printer className="w-4 h-4" />
-                  <span>सदस्यता कार्ड प्रिंट करें</span>
-                </button>
+              <div className="flex justify-center pt-1 no-print">
                 <button
                   type="button"
                   onClick={handleClose}
-                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs cursor-pointer transition-all"
+                  className="px-6 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs cursor-pointer transition-all"
                 >
-                  <span>समाप्त करें</span>
+                  <span>समाप्त करें (Close)</span>
                 </button>
               </div>
             </div>

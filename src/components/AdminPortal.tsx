@@ -31,6 +31,9 @@ import {
   Inbox
 } from "lucide-react";
 import { PressRelease } from "../types";
+import { GoogleDriveMemberSync } from "./GoogleDriveMemberSync";
+import { memberToExcelRow, mergeMemberRows } from "../utils/googleDriveMemberSync";
+import { downloadMemberIdCardPdf } from "../utils/memberCardPdf";
 
 interface AdminPortalProps {
   onRefreshData?: () => void;
@@ -2086,6 +2089,28 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             />
           </div>
 
+          {/* Google Drive Sync for All Successful Membership Payments */}
+          <GoogleDriveMemberSync
+            rows={
+              mergeMemberRows(
+                members
+                  .filter((m) => m.isFeePaid !== false || Number(m.membershipFee || 0) > 0)
+                  .map((m) => memberToExcelRow(m)),
+                cashfreeTransactions
+                  .filter((tx) => tx.orderType === "MEMBERSHIP" && tx.paymentStatus === "SUCCESS")
+                  .map((tx) => ({
+                    MemberName: String(tx.memberData?.fullName || tx.customerName || "सदस्य").trim(),
+                    Mobilenumber: String(tx.customerMobile || tx.memberData?.phone || "").trim(),
+                    District: String(tx.memberData?.precinct || "उत्तर प्रदेश").trim(),
+                    MemAmt: Number(tx.paymentAmount ?? 0),
+                    Date: String((tx.transactionDate || tx.createdDate || new Date().toISOString()).split("T")[0])
+                  }))
+              ).merged
+            }
+            title="सभी सफल सदस्यता भुगतान Google Drive Excel (member.xlsx) में सिंक करें"
+            description="सफल सदस्यता भुगतान प्राप्त सभी कार्यकर्ताओं का विवरण (MemberName, Mobilenumber, District, MemAmt, Date) Google Drive की member.xlsx फ़ाइल में सेव करें।"
+          />
+
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-orange-50 text-orange-950 font-black border-b border-orange-200">
@@ -2098,6 +2123,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   <th className="p-3">सदस्यता शुल्क</th>
                   <th className="p-3">भुगतान मोड & UTR</th>
                   <th className="p-3">तिथि</th>
+                  <th className="p-3">ID कार्ड PDF</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium">
@@ -2120,6 +2146,16 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       {m.utrNumber && <span className="font-mono text-orange-700 text-[10px] block">{m.utrNumber}</span>}
                     </td>
                     <td className="p-3 text-slate-500">{m.joinedDate}</td>
+                    <td className="p-3">
+                      <button
+                        type="button"
+                        onClick={() => downloadMemberIdCardPdf(m)}
+                        className="px-2.5 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-bold text-[10px] flex items-center space-x-1 cursor-pointer"
+                      >
+                        <Download className="w-3 h-3" />
+                        <span>PDF</span>
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
