@@ -654,22 +654,27 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
                   </div>
                 </div>
 
-                {/* Cashfree Web Redirect Checkout Button */}
-                <div className="bg-orange-50/80 border border-orange-300 rounded-2xl p-4 space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-black text-orange-950 flex items-center gap-1.5">
-                      <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                {/* Cashfree PG Checkout Only */}
+                <div className="bg-orange-50/80 border-2 border-orange-300 rounded-2xl p-5 space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-sm font-black text-orange-950 flex items-center gap-1.5">
+                      <ShieldCheck className="w-5 h-5 text-emerald-600" />
                       <span>कैशफ्री सुरक्षित पेमेंट गेटवे (Cashfree PG Checkout)</span>
                     </span>
-                    <span className="text-[10px] bg-emerald-100 text-emerald-900 font-bold px-2 py-0.5 rounded-full">
-                      Instant Card / UPI / NetBanking
+                    <span className="text-[10px] bg-emerald-100 text-emerald-900 font-bold px-2.5 py-0.5 rounded-full">
+                      UPI / Cards / NetBanking / Wallets
                     </span>
                   </div>
+
+                  <p className="text-xs text-slate-700 font-medium leading-relaxed">
+                    सदस्यता शुल्क भुगतान के लिए आप कैशफ्री के सुरक्षित पेमेंट गेटवे पर UPI (PhonePe, GPay, Paytm), डेबिट/क्रेडिट कार्ड अथवा नेट बैंकिंग द्वारा तुरंत भुगतान कर सकते हैं।
+                  </p>
+
                   <button
                     type="button"
                     onClick={handlePayMembershipWithCashfree}
                     disabled={isCashfreeLoading}
-                    className="w-full py-3 px-4 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-black text-xs shadow-md flex items-center justify-center space-x-2 cursor-pointer transition-all disabled:opacity-75"
+                    className="w-full py-3.5 px-5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-black text-sm shadow-md flex items-center justify-center space-x-2 cursor-pointer transition-all disabled:opacity-75"
                   >
                     {isCashfreeLoading ? (
                       <>
@@ -678,259 +683,25 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
                       </>
                     ) : (
                       <>
-                        <span>Pay ₹{membershipFee} via Cashfree (Web Redirect)</span>
+                        <Lock className="w-4 h-4 text-orange-100" />
+                        <span>Pay ₹{membershipFee} via Cashfree Gateway</span>
                         <ArrowRight className="w-4 h-4" />
                       </>
                     )}
                   </button>
+
                   {paymentError && (
-                    <div className="p-2.5 bg-red-50 border border-red-300 text-red-700 rounded-xl text-xs font-bold flex items-center space-x-2">
+                    <div className="p-3 bg-red-50 border border-red-300 text-red-700 rounded-xl text-xs font-bold flex items-center space-x-2">
                       <AlertCircle className="w-4 h-4 shrink-0" />
                       <span>{paymentError}</span>
                     </div>
                   )}
+
+                  <div className="flex items-center justify-center space-x-1.5 text-[11px] font-bold text-slate-500 pt-1">
+                    <Lock className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>256-Bit SSL Encrypted • Official Cashfree PG API v3</span>
+                  </div>
                 </div>
-
-                <div className="text-center">
-                  <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400">
-                    — आधिकारिक कैशफ्री भुगतान गेटवे (Cashfree Payment Gateway) —
-                  </span>
-                </div>
-
-                {/* Payment Tabs */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setPaymentTab("upi")}
-                    className={`p-3 rounded-2xl border-2 text-center text-xs font-black transition-all cursor-pointer flex flex-col items-center justify-center space-y-1 ${
-                      paymentTab === "upi"
-                        ? "border-orange-600 bg-orange-50 text-orange-950 shadow-md"
-                        : "border-slate-200 text-slate-700"
-                    }`}
-                  >
-                    <Smartphone className="w-4 h-4 text-orange-600" />
-                    <span>UPI / QR</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setPaymentTab("card")}
-                    className={`p-3 rounded-2xl border-2 text-center text-xs font-black transition-all cursor-pointer flex flex-col items-center justify-center space-y-1 ${
-                      paymentTab === "card"
-                        ? "border-orange-600 bg-orange-50 text-orange-950 shadow-md"
-                        : "border-slate-200 text-slate-700"
-                    }`}
-                  >
-                    <CreditCard className="w-4 h-4 text-orange-600" />
-                    <span>कार्ड (Card)</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setPaymentTab("netbanking")}
-                    className={`p-3 rounded-2xl border-2 text-center text-xs font-black transition-all cursor-pointer flex flex-col items-center justify-center space-y-1 ${
-                      paymentTab === "netbanking"
-                        ? "border-orange-600 bg-orange-50 text-orange-950 shadow-md"
-                        : "border-slate-200 text-slate-700"
-                    }`}
-                  >
-                    <Landmark className="w-4 h-4 text-orange-600" />
-                    <span>नेट बैंकिंग</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setPaymentTab("wallet")}
-                    className={`p-3 rounded-2xl border-2 text-center text-xs font-black transition-all cursor-pointer flex flex-col items-center justify-center space-y-1 ${
-                      paymentTab === "wallet"
-                        ? "border-orange-600 bg-orange-50 text-orange-950 shadow-md"
-                        : "border-slate-200 text-slate-700"
-                    }`}
-                  >
-                    <Wallet className="w-4 h-4 text-orange-600" />
-                    <span>वॉलेट (Wallet)</span>
-                  </button>
-                </div>
-
-                {/* UPI Tab */}
-                {paymentTab === "upi" && (
-                  <div className="p-5 bg-orange-50/60 border border-orange-200 rounded-3xl space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                      <button
-                        type="button"
-                        onClick={() => launchMemberPaymentApp("phonepe")}
-                        className="p-3 bg-purple-700 hover:bg-purple-800 text-white rounded-xl font-black text-xs shadow flex items-center justify-center space-x-1.5 cursor-pointer"
-                      >
-                        <Smartphone className="w-4 h-4" />
-                        <span>PhonePe (₹{membershipFee})</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => launchMemberPaymentApp("gpay")}
-                        className="p-3 bg-slate-900 hover:bg-black text-white rounded-xl font-black text-xs shadow flex items-center justify-center space-x-1.5 cursor-pointer"
-                      >
-                        <Smartphone className="w-4 h-4" />
-                        <span>Google Pay</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => launchMemberPaymentApp("paytm")}
-                        className="p-3 bg-sky-600 hover:bg-sky-700 text-white rounded-xl font-black text-xs shadow flex items-center justify-center space-x-1.5 cursor-pointer"
-                      >
-                        <Smartphone className="w-4 h-4" />
-                        <span>Paytm UPI</span>
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center pt-2">
-                      <div className="flex flex-col items-center p-3 bg-white border border-orange-200 rounded-2xl">
-                        <img 
-                          src={paymentQrImg} 
-                          alt="SBI UPI QR" 
-                          className="w-36 h-36 object-contain rounded-xl"
-                        />
-                        <span className="text-[10px] text-slate-600 font-bold mt-1">UPI ID: {officialUpiId}</span>
-                      </div>
-
-                      <div className="space-y-3 text-xs font-bold">
-                        <label className="block text-slate-800">12-अंकीय UPI UTR (RRN) दर्ज करें:</label>
-                        <input
-                          type="text"
-                          maxLength={24}
-                          placeholder="उदा. 420192847120"
-                          value={utrNumber}
-                          onChange={(e) => setUtrNumber(e.target.value.toUpperCase())}
-                          className="w-full px-3.5 py-2.5 rounded-xl border border-orange-300 bg-white font-mono text-sm uppercase"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => submitMemberRegistration(membershipFee, "UPI Payment", utrNumber)}
-                          disabled={isSubmitting}
-                          className="w-full py-3 bg-emerald-700 hover:bg-emerald-800 text-white font-black text-xs rounded-xl shadow cursor-pointer transition-all"
-                        >
-                          {isSubmitting ? "सत्यापन जारी है..." : "पुष्टि करें व डिजिटल ID कार्ड पाएं"}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Card Tab */}
-                {paymentTab === "card" && (
-                  <div className="p-5 bg-slate-50 border border-slate-200 rounded-3xl space-y-4 text-xs font-bold">
-                    <div>
-                      <label className="block text-slate-700 mb-1">कार्ड नंबर (Card Number):</label>
-                      <input
-                        type="text"
-                        maxLength={19}
-                        placeholder="4532 •••• •••• 8921"
-                        value={cardNumber}
-                        onChange={(e) => setCardNumber(e.target.value)}
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white font-mono"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-slate-700 mb-1">समाप्ति (MM/YY):</label>
-                        <input
-                          type="text"
-                          maxLength={5}
-                          placeholder="12/28"
-                          value={cardExpiry}
-                          onChange={(e) => setCardExpiry(e.target.value)}
-                          className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white font-mono"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-slate-700 mb-1">CVV:</label>
-                        <input
-                          type="password"
-                          maxLength={4}
-                          placeholder="•••"
-                          value={cardCvv}
-                          onChange={(e) => setCardCvv(e.target.value)}
-                          className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white font-mono"
-                        />
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleStartOnlineGateway}
-                      className="w-full py-3.5 bg-orange-600 hover:bg-orange-700 text-white font-black text-xs rounded-xl shadow cursor-pointer"
-                    >
-                      कार्ड द्वारा भुगतान करें • Pay ₹{membershipFee}
-                    </button>
-                  </div>
-                )}
-
-                {/* Netbanking Tab */}
-                {paymentTab === "netbanking" && (
-                  <div className="p-5 bg-slate-50 border border-slate-200 rounded-3xl space-y-4 text-xs font-bold">
-                    <label className="block text-slate-700">बैंक चुनें (Select Bank):</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {POPULAR_BANKS.map((b) => (
-                        <button
-                          key={b.id}
-                          type="button"
-                          onClick={() => setSelectedBank(b.name)}
-                          className={`p-2.5 rounded-xl border text-left cursor-pointer ${
-                            selectedBank === b.name
-                              ? "border-orange-500 bg-orange-50 text-orange-950 font-black"
-                              : "border-slate-300 bg-white text-slate-800"
-                          }`}
-                        >
-                          {b.name}
-                        </button>
-                      ))}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleStartOnlineGateway}
-                      className="w-full py-3.5 bg-orange-600 hover:bg-orange-700 text-white font-black text-xs rounded-xl shadow cursor-pointer"
-                    >
-                      {selectedBank} से भुगतान करें (₹{membershipFee})
-                    </button>
-                  </div>
-                )}
-
-                {/* Wallet Tab */}
-                {paymentTab === "wallet" && (
-                  <div className="p-5 bg-slate-50 border border-slate-200 rounded-3xl space-y-4 text-xs font-bold">
-                    <label className="block text-slate-700">वॉलेट चुनें (Select Wallet):</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {WALLETS_LIST.map((w) => (
-                        <button
-                          key={w.id}
-                          type="button"
-                          onClick={() => setSelectedWallet(w.id)}
-                          className={`p-3 rounded-xl border text-left cursor-pointer ${
-                            selectedWallet === w.id
-                              ? "border-orange-500 bg-orange-50 text-orange-950 font-black"
-                              : "border-slate-300 bg-white text-slate-800"
-                          }`}
-                        >
-                          {w.name}
-                        </button>
-                      ))}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleStartOnlineGateway}
-                      className="w-full py-3.5 bg-orange-600 hover:bg-orange-700 text-white font-black text-xs rounded-xl shadow cursor-pointer"
-                    >
-                      वॉलेट से भुगतान करें (₹{membershipFee})
-                    </button>
-                  </div>
-                )}
-
-                {paymentError && (
-                  <div className="p-3 bg-red-50 border border-red-300 text-red-700 rounded-xl text-xs font-bold flex items-center space-x-2">
-                    <AlertCircle className="w-4 h-4 shrink-0" />
-                    <span>{paymentError}</span>
-                  </div>
-                )}
 
               </div>
             )}
