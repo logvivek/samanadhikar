@@ -223,13 +223,13 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [isChangingCreds, setIsChangingCreds] = useState<boolean>(false);
 
   useEffect(() => {
-    // Check saved token in localStorage
     const savedToken = localStorage.getItem("sap_admin_token");
     if (savedToken) {
       verifyToken(savedToken);
+    } else {
+      fetchAllData();
     }
     fetchPartyInfo();
-    fetchAllData();
   }, []);
 
   const verifyToken = async (token: string) => {
@@ -238,8 +238,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       if (isValid) {
         setIsAdminLoggedIn(true);
         setAdminToken(token);
+        await fetchAllData(token);
       } else {
         localStorage.removeItem("sap_admin_token");
+        await fetchAllData();
       }
     } catch (err) {
       console.error(err);
@@ -249,8 +251,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const fetchPartyInfo = async () => {
     try {
       const res = await fetch("/api/party-info");
-      const data = await res.json();
-      if (data.success && data.partyInfo) {
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.success && data?.partyInfo) {
         setPartyInfo(data.partyInfo);
       }
     } catch (err) {
@@ -258,11 +260,17 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     }
   };
 
-  const fetchAllData = async () => {
+  const fetchAllData = async (tokenOverride?: string) => {
     setIsLoadingData(true);
     try {
-      const currentToken = adminToken || localStorage.getItem("sap_admin_token") || "";
-      const headers: Record<string, string> = currentToken ? { "X-Admin-Token": currentToken } : {};
+      const resolvedOverride = typeof tokenOverride === "string" ? tokenOverride : "";
+      const currentToken = resolvedOverride || adminToken || localStorage.getItem("sap_admin_token") || "";
+      const headers: Record<string, string> = currentToken
+        ? {
+            "Authorization": `Bearer ${currentToken}`,
+            "X-Admin-Token": currentToken
+          }
+        : {};
 
       const [prRes, prArchRes, memRes, donRes, evtRes, evtArchRes] = await Promise.all([
         fetch("/api/press-releases"),
@@ -273,33 +281,31 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         fetch("/api/events/archive")
       ]);
 
-      const prData = await prRes.json();
-      if (prData.pressReleases) setPressReleases(prData.pressReleases);
+      const [prData, prArchData, memData, donData, evtData, evtArchData] = await Promise.all([
+        prRes.json().catch(() => ({})),
+        prArchRes.json().catch(() => ({})),
+        memRes.json().catch(() => ({})),
+        donRes.json().catch(() => ({})),
+        evtRes.json().catch(() => ({})),
+        evtArchRes.json().catch(() => ({}))
+      ]);
 
-      const prArchData = await prArchRes.json();
-      if (prArchData.archivedPressReleases) setArchivedPressReleases(prArchData.archivedPressReleases);
-
-      const memData = await memRes.json();
-      if (memData.members) setMembers(memData.members);
-
-      const donData = await donRes.json();
-      if (donData.recentDonations) {
+      if (prData?.pressReleases) setPressReleases(prData.pressReleases);
+      if (prArchData?.archivedPressReleases) setArchivedPressReleases(prArchData.archivedPressReleases);
+      if (memData?.members) setMembers(memData.members);
+      if (donData?.recentDonations) {
         setDonations(donData.recentDonations);
         setTotalRaised(donData.totalRaised || 0);
       }
-
-      const evtData = await evtRes.json();
-      if (evtData.events) setEvents(evtData.events);
-
-      const evtArchData = await evtArchRes.json();
-      if (evtArchData.archivedEvents) setArchivedEvents(evtArchData.archivedEvents);
+      if (evtData?.events) setEvents(evtData.events);
+      if (evtArchData?.archivedEvents) setArchivedEvents(evtArchData.archivedEvents);
 
       if (currentToken) {
         try {
           const cfRes = await fetch("/api/cashfree/transactions", { headers });
           if (cfRes.ok) {
-            const cfData = await cfRes.json();
-            if (cfData.transactions) setCashfreeTransactions(cfData.transactions);
+            const cfData = await cfRes.json().catch(() => ({}));
+            if (cfData?.transactions) setCashfreeTransactions(cfData.transactions);
           }
         } catch {}
       }
@@ -326,6 +332,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           setAdminUsername(data.username);
           setChangeNewUser(data.username);
         }
+        await fetchAllData(data.token);
         showNotification("एडमिन लॉगिन सफल!", "success");
       } else {
         setAuthError(data.error || "लॉगिन विफल। कृपया सही यूज़रनेम व पासवर्ड दर्ज करें।");
@@ -351,17 +358,13 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
     setIsChangingCreds(true);
     try {
-      // Save locally for static/offline compatibility
-      localStorage.setItem("sap_custom_admin_creds", JSON.stringify({
-        username: changeNewUser.trim(),
-        password: changeNewPass.trim()
-      }));
-
+      const currentToken = adminToken || localStorage.getItem("sap_admin_token") || "";
       const res = await fetch("/api/admin/change-credentials", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Admin-Token": adminToken
+          "Authorization": `Bearer ${currentToken}`,
+          "X-Admin-Token": currentToken
         },
         body: JSON.stringify({
           currentPassword: changeCurrentPass,
@@ -370,21 +373,22 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         })
       });
 
-      const contentType = res.headers.get("content-type");
-      if (res.ok && contentType && contentType.includes("application/json")) {
-        const data = await res.json();
-        if (data.success) {
-          setAdminUsername(data.username || changeNewUser);
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.success) {
+        if (data.token) {
+          setAdminToken(data.token);
+          localStorage.setItem("sap_admin_token", data.token);
         }
+        setAdminUsername(data.username || changeNewUser.trim());
+        setChangeCurrentPass("");
+        setChangeNewPass("");
+        setChangeConfirmPass("");
+        showNotification("एडमिन यूज़रनेम एवं पासवर्ड सफलतापूर्वक अपडेट हो गए!", "success");
+      } else {
+        showNotification(data?.error || "वर्तमान पासवर्ड गलत है या अपडेट विफल रहा।", "error");
       }
-
-      setAdminUsername(changeNewUser.trim());
-      setChangeCurrentPass("");
-      setChangeNewPass("");
-      setChangeConfirmPass("");
-      showNotification("एडमिन यूज़रनेम एवं पासवर्ड सफलतापूर्वक अपडेट हो गए!", "success");
     } catch (err) {
-      showNotification("एडमिन यूज़रनेम एवं पासवर्ड (स्थानीय स्टोरेज) में अपडेट हो गए!", "success");
+      showNotification("सर्वर से संपर्क नहीं हो सका। कृपया पुनः प्रयास करें।", "error");
     } finally {
       setIsChangingCreds(false);
     }
@@ -864,7 +868,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           )}
 
           <button
-            onClick={fetchAllData}
+            onClick={() => fetchAllData()}
             className="flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 transition-colors cursor-pointer"
           >
             <RefreshCw className={`w-4 h-4 ${isLoadingData ? "animate-spin" : ""}`} />

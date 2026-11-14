@@ -23,8 +23,8 @@ export async function loginAdmin(usernameInput: string, passwordInput: string): 
       body: JSON.stringify({ username, password })
     });
 
-    const data = await res.json();
-    if (res.ok && data.success && data.token) {
+    const data = await res.json().catch(() => null);
+    if (res.ok && data?.success && data?.token) {
       return {
         success: true,
         token: data.token,
@@ -34,7 +34,7 @@ export async function loginAdmin(usernameInput: string, passwordInput: string): 
 
     return {
       success: false,
-      error: data.error || "अवैध एडमिन यूज़रनेम या पासवर्ड।"
+      error: data?.error || (res.ok ? "अवैध एडमिन यूज़रनेम या पासवर्ड।" : `सर्वर त्रुटि (${res.status}): कृपया पुनः प्रयास करें।`)
     };
   } catch (err) {
     console.error("Login request failed:", err);
@@ -59,8 +59,8 @@ export async function verifyAdminToken(token: string): Promise<boolean> {
     });
 
     if (res.ok) {
-      const data = await res.json();
-      return Boolean(data.success && data.isAdmin);
+      const data = await res.json().catch(() => null);
+      return Boolean(data?.success && data?.isAdmin);
     }
   } catch (e) {
     console.warn("Token verification request failed:", e);

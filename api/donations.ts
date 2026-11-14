@@ -1,20 +1,14 @@
 import fs from "node:fs";
 import path from "node:path";
 
-function getDbFilePath() {
-  const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NETLIFY);
-  const dataDir = isServerless ? path.join("/tmp", "data") : path.join(process.cwd(), "data");
-  try {
-    if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
-  } catch {}
-  return path.join(dataDir, "production_db.json");
-}
-
 function readDb(): any {
-  const dbFile = getDbFilePath();
-  try {
-    if (fs.existsSync(dbFile)) return JSON.parse(fs.readFileSync(dbFile, "utf-8"));
-  } catch {}
+  const tmpFile = path.join("/tmp", "data", "production_db.json");
+  const rootFile = path.join(process.cwd(), "data", "production_db.json");
+  for (const filePath of [tmpFile, rootFile]) {
+    try {
+      if (fs.existsSync(filePath)) return JSON.parse(fs.readFileSync(filePath, "utf-8"));
+    } catch {}
+  }
   return { donations: [] };
 }
 
