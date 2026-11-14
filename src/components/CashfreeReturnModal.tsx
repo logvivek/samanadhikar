@@ -3,7 +3,6 @@ import {
   CheckCircle,
   AlertCircle,
   Loader2,
-  Printer,
   X,
   ShieldCheck,
   UserCheck,
@@ -12,9 +11,9 @@ import {
   RotateCcw,
   Ban
 } from "lucide-react";
-import { PARTY_INFO } from "../data/campaignData";
 import { DonationReceipt, MemberRecord } from "../types";
 import { MemberIdCard } from "./MemberIdCard";
+import { OfficialReceiptCard } from "./OfficialReceiptCard";
 import { GoogleDriveMemberSync } from "./GoogleDriveMemberSync";
 import { memberToExcelRow } from "../utils/googleDriveMemberSync";
 
@@ -139,10 +138,6 @@ export const CashfreeReturnModal: React.FC<CashfreeReturnModalProps> = ({
     }
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
-
   const handleClose = () => {
     cleanUrlQuery();
     setIsOpen(false);
@@ -162,10 +157,10 @@ export const CashfreeReturnModal: React.FC<CashfreeReturnModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/80 backdrop-blur-md overflow-y-auto animate-in fade-in">
-      <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border-2 border-orange-400 overflow-hidden text-slate-900 my-auto animate-in zoom-in-95">
+    <div className="print-reset-container fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/80 backdrop-blur-md overflow-y-auto animate-in fade-in">
+      <div className="print-reset-container bg-white rounded-3xl max-w-2xl w-full shadow-2xl border-2 border-orange-400 overflow-hidden text-slate-900 my-auto animate-in zoom-in-95">
         {/* Header */}
-        <div className="bg-gradient-to-r from-orange-600 via-amber-600 to-orange-700 px-6 py-4 text-white flex items-center justify-between">
+        <div className="no-print bg-gradient-to-r from-orange-600 via-amber-600 to-orange-700 px-6 py-4 text-white flex items-center justify-between">
           <div className="flex items-center space-x-2.5">
             <ShieldCheck className="w-6 h-6 text-orange-200 shrink-0" />
             <div>
@@ -190,7 +185,7 @@ export const CashfreeReturnModal: React.FC<CashfreeReturnModalProps> = ({
         </div>
 
         {/* Content Body */}
-        <div className="p-6 sm:p-8 space-y-6">
+        <div className="print-reset-container p-6 sm:p-8 space-y-6">
           {/* Loading / Verifying State */}
           {status === "VERIFYING" && (
             <div className="text-center py-8 space-y-4">
@@ -206,8 +201,8 @@ export const CashfreeReturnModal: React.FC<CashfreeReturnModalProps> = ({
 
           {/* SUCCESS: Donation Section 80GGC Receipt */}
           {status === "SUCCESS" && receipt && (
-            <div className="space-y-6">
-              <div className="text-center space-y-2">
+            <div className="space-y-5">
+              <div className="no-print text-center space-y-2">
                 <div className="w-14 h-14 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto shadow-sm">
                   <CheckCircle className="w-8 h-8" />
                 </div>
@@ -219,66 +214,23 @@ export const CashfreeReturnModal: React.FC<CashfreeReturnModalProps> = ({
                 </p>
               </div>
 
-              <div className="border-2 border-emerald-500 rounded-2xl p-5 bg-gradient-to-b from-emerald-50/40 via-white to-emerald-50/20 space-y-4 shadow-md text-xs">
-                <div className="flex items-center justify-between border-b border-emerald-200 pb-3">
-                  <div>
-                    <span className="font-black text-emerald-950 text-sm block">समान अधिकार पार्टी (SAMAN ADHIKAR PARTY)</span>
-                    <span className="text-[10px] text-slate-600 font-mono">PAN: {receipt.partyPan || PARTY_INFO.panNumber} • 56/112/2024/PPS-I</span>
-                  </div>
-                  <span className="px-2.5 py-1 bg-emerald-100 text-emerald-900 font-black text-[10px] rounded-full uppercase">
-                    Sec 80GGC Tax Relief
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="bg-white p-2.5 rounded-xl border border-slate-200">
-                    <span className="text-[10px] text-slate-500 block uppercase">रसीद संख्या (Receipt No)</span>
-                    <span className="font-mono font-black text-slate-900">{receipt.receiptNumber}</span>
-                  </div>
-                  <div className="bg-white p-2.5 rounded-xl border border-slate-200">
-                    <span className="text-[10px] text-slate-500 block uppercase">Transaction ID / Cashfree Ref</span>
-                    <span className="font-mono font-black text-orange-600 truncate block">
-                      {internalTransactionId || receipt.transactionId}
-                    </span>
-                    {cashfreePaymentId && (
-                      <span className="text-[10px] text-slate-500 font-mono block">CF Pay ID: {cashfreePaymentId}</span>
-                    )}
-                  </div>
-                  <div className="bg-white p-2.5 rounded-xl border border-slate-200">
-                    <span className="text-[10px] text-slate-500 block uppercase">Order ID & Method</span>
-                    <span className="font-mono font-bold text-slate-800 block truncate">{orderId}</span>
-                    <span className="text-[10px] text-emerald-700 font-bold">{paymentMethod || receipt.paymentMethod}</span>
-                  </div>
-                  <div className="bg-white p-2.5 rounded-xl border border-slate-200">
-                    <span className="text-[10px] text-slate-500 block uppercase">राशि व सहयोगकर्ता</span>
-                    <span className="font-black text-emerald-700 text-base block">₹{receipt.amount.toLocaleString("en-IN")} INR</span>
-                    <span className="font-bold text-slate-900 text-[11px]">{receipt.donorName}</span>
-                  </div>
-                </div>
-
-                <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-[11px] text-slate-700 leading-relaxed">
-                  <strong>आयकर छूट सूचना:</strong> {receipt.fecTaxNotice}
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={handlePrint}
-                  className="px-4 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-black text-xs flex items-center space-x-2 cursor-pointer shadow-md transition-all"
-                >
-                  <Printer className="w-4 h-4" />
-                  <span>रसीद प्रिंट करें (Print 80GGC Receipt)</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleClose}
-                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs cursor-pointer transition-all"
-                >
-                  <span>मुख्य पृष्ठ पर लौटें</span>
-                </button>
-              </div>
+              <OfficialReceiptCard
+                receipt={receipt}
+                orderId={orderId}
+                cashfreePaymentId={cashfreePaymentId}
+                internalTransactionId={internalTransactionId}
+                paymentMethod={paymentMethod}
+                showActions={true}
+                onAfterPrintAction={
+                  <button
+                    type="button"
+                    onClick={handleClose}
+                    className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs cursor-pointer transition-all"
+                  >
+                    <span>मुख्य पृष्ठ पर लौटें</span>
+                  </button>
+                }
+              />
             </div>
           )}
 

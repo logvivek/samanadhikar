@@ -84,8 +84,19 @@ function buildReceipt(donorName: string, amount: number, txnRef: string, method:
     paymentStatus: "SUCCESS",
     paymentMethod: method,
     paymentRef: txnRef,
+    panNumber: donorInfo?.panNumber,
+    donorEmail: donorInfo?.email,
+    donorPhone: donorInfo?.phone,
+    donorAddress: donorInfo?.address,
+    donorState: donorInfo?.state || donorInfo?.precinct,
+    citizenship: donorInfo?.citizenship || "INDIAN",
     partyPan: "AAOAS8885L",
-    partyRegNumber: "56/112/2024/PPS-I (ECI Recognized)"
+    partyRegNumber: "56/112/2024/PPS-I (ECI Recognized)",
+    bankDetails: {
+      accountNo: "34465318239",
+      ifsc: "SBIN0002467",
+      upiId: "samanadhikarparty@sbi"
+    }
   };
 }
 

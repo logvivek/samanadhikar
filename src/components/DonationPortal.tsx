@@ -3,6 +3,7 @@ import { load as loadCashfree } from "@cashfreepayments/cashfree-js";
 import paymentQrImg from "../assets/images/payment_upi_qr.jpg";
 import { DONATION_PRESETS, PRECINCTS_LIST, PARTY_INFO, INDIAN_STATES } from "../data/campaignData";
 import { DonationReceipt } from "../types";
+import { OfficialReceiptCard } from "./OfficialReceiptCard";
 import { validateUtrNumber } from "../utils/utrValidation";
 import { 
   Heart, 
@@ -1042,145 +1043,31 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
         {/* ========================================================================= */}
         {step === "receipt" && generatedReceipt && (
           <div className="max-w-3xl mx-auto space-y-6">
-            
-            {/* Action Bar */}
-            <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-emerald-300 shadow-sm">
+            <div className="no-print flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-emerald-300 shadow-sm">
               <div className="flex items-center space-x-2 text-emerald-800 font-black text-sm">
                 <CheckCircle className="w-5 h-5 text-emerald-600" />
                 <span>सहयोग सफल! आधिकारिक 80GGC टैक्स रसीद जनरेट हो गई है।</span>
               </div>
 
-              <div className="flex items-center space-x-2">
-                <button
-                  type="button"
-                  onClick={() => window.print()}
-                  className="px-4 py-2 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-black flex items-center space-x-1.5 cursor-pointer transition-all shadow"
-                >
-                  <Printer className="w-4 h-4" />
-                  <span>प्रिंट (Print Receipt)</span>
-                </button>
-                
-                <button
-                  type="button"
-                  onClick={() => {
-                    setStep("details");
-                    setGeneratedReceipt(null);
-                  }}
-                  className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-black cursor-pointer transition-all shadow"
-                >
-                  <span>नया सहयोग करें</span>
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setStep("details");
+                  setGeneratedReceipt(null);
+                }}
+                className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-black cursor-pointer transition-all shadow"
+              >
+                <span>नया सहयोग करें</span>
+              </button>
             </div>
 
-            {/* Official Certificate Card */}
-            <div className="bg-white border-2 border-emerald-600 rounded-3xl p-8 shadow-2xl space-y-6 text-slate-900 relative print:border-none print:shadow-none">
-              
-              {/* Certificate Header */}
-              <div className="text-center space-y-2 border-b-2 border-slate-200 pb-5">
-                <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-100 text-emerald-950 text-[11px] font-black uppercase">
-                  <span>भारत निर्वाचन आयोग (ECI) पंजीकृत राजनीतिक दल</span>
-                </div>
-                <h2 className="text-2xl sm:text-3xl font-black text-orange-950 tracking-tight">
-                  समान अधिकार पार्टी (SAMAN ADHIKAR PARTY)
-                </h2>
-                <p className="text-xs text-slate-600 font-bold">
-                  केंद्रीय कार्यालय: सदर बाजार, आगरा एवं मथुरा मंडल, उत्तर प्रदेश | दूरभाष: 9412165541, 7310732088
-                </p>
-                <div className="flex flex-wrap items-center justify-center gap-3 text-[11px] font-mono font-bold text-slate-700 pt-1">
-                  <span>पार्टी PAN: <strong className="text-slate-950">{generatedReceipt.partyPan || PARTY_INFO.panNumber || "AAOAS8885L"}</strong></span>
-                  <span>•</span>
-                  <span>पंजीकरण संख्या: <strong>56/112/2024/PPS-I</strong></span>
-                  <span>•</span>
-                  <span>धारा 80GGC / 80GGB आयकर अधिनियम 1961</span>
-                </div>
-              </div>
-
-              {/* Receipt Title */}
-              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-center space-y-1">
-                <span className="text-xs uppercase font-black tracking-widest text-emerald-900 block">
-                  आधिकारिक सहयोग रसीद एवं कर छूट प्रमाण पत्र
-                </span>
-                <span className="text-sm font-black text-emerald-950">
-                  OFFICIAL CONTRIBUTION & 100% TAX DEDUCTION RECEIPT
-                </span>
-              </div>
-
-              {/* Grid of Receipt Data */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                <div className="p-3 bg-slate-50 rounded-xl space-y-1">
-                  <span className="text-slate-500 font-bold block text-[10px] uppercase">रसीद संख्या (Receipt No.)</span>
-                  <span className="font-mono font-black text-sm text-slate-900">{generatedReceipt.receiptNumber}</span>
-                </div>
-
-                <div className="p-3 bg-slate-50 rounded-xl space-y-1">
-                  <span className="text-slate-500 font-bold block text-[10px] uppercase">ट्रांजैक्शन / UTR संख्या</span>
-                  <span className="font-mono font-black text-sm text-orange-600">{generatedReceipt.paymentRef}</span>
-                </div>
-
-                <div className="p-3 bg-slate-50 rounded-xl space-y-1">
-                  <span className="text-slate-500 font-bold block text-[10px] uppercase">सहयोगकर्ता का नाम (Donor Name)</span>
-                  <span className="font-black text-slate-900 text-sm">{generatedReceipt.donorName}</span>
-                </div>
-
-                <div className="p-3 bg-slate-50 rounded-xl space-y-1">
-                  <span className="text-slate-500 font-bold block text-[10px] uppercase">सहयोगकर्ता राज्य / क्षेत्र (State / Region)</span>
-                  <span className="font-bold text-slate-900 text-sm">
-                    {generatedReceipt.donorState || donorState || "उत्तर प्रदेश"}
-                  </span>
-                </div>
-
-                <div className="p-3 bg-slate-50 rounded-xl space-y-1">
-                  <span className="text-slate-500 font-bold block text-[10px] uppercase">सहयोग राशि (Amount)</span>
-                  <span className="font-black text-emerald-700 text-base">₹{generatedReceipt.amount.toLocaleString("en-IN")}</span>
-                </div>
-
-                <div className="p-3 bg-slate-50 rounded-xl space-y-1">
-                  <span className="text-slate-500 font-bold block text-[10px] uppercase">दिनांक व समय (Date & Time)</span>
-                  <span className="font-bold text-slate-800">{generatedReceipt.date}</span>
-                </div>
-
-                <div className="p-3 bg-slate-50 rounded-xl space-y-1">
-                  <span className="text-slate-500 font-bold block text-[10px] uppercase">भुगतान माध्यम (Payment Method)</span>
-                  <span className="font-bold text-slate-800">{generatedReceipt.paymentMethod}</span>
-                </div>
-
-                <div className="p-3 bg-slate-50 rounded-xl space-y-1">
-                  <span className="text-slate-500 font-bold block text-[10px] uppercase">भुगतान स्थिति (Status)</span>
-                  <span className="inline-flex items-center space-x-1 font-black text-emerald-700">
-                    <CheckCircle className="w-3.5 h-3.5" />
-                    <span>सत्यापित एवं स्वीकृत (VERIFIED)</span>
-                  </span>
-                </div>
-              </div>
-
-              {/* Tax Exemption Endorsement */}
-              <div className="p-4 bg-amber-50/80 border border-amber-200 rounded-2xl text-xs space-y-1.5 text-slate-800">
-                <span className="font-black text-amber-950 block">आयकर अधिनियम 1961 की धारा 80GGC के अंतर्गत कर कटौती:</span>
-                <p className="text-[11px] leading-relaxed text-slate-700">
-                  समान अधिकार पार्टी को चेक, बैंक ट्रांसफर, UPI अथवा क्रेडिट/डेबिट कार्ड द्वारा दिया गया आपका यह सहयोग आयकर अधिनियम 1961 की धारा 80GGC (व्यक्तियों हेतु) एवं धारा 80GGB (कंपनियों हेतु) के तहत 100% कर कटौती हेतु मान्य है।
-                </p>
-              </div>
-
-              {/* Signature and Seal */}
-              <div className="flex items-end justify-between pt-6 border-t border-slate-200 text-xs">
-                <div className="space-y-1">
-                  <span className="text-[10px] text-slate-500 block uppercase">बैंक प्राप्ति खाता:</span>
-                  <span className="font-mono text-[11px] font-bold text-slate-800">
-                    SBI A/C: {generatedReceipt.bankDetails?.accountNo} • IFSC: {generatedReceipt.bankDetails?.ifsc}
-                  </span>
-                </div>
-
-                <div className="text-right space-y-1">
-                  <span className="font-black text-orange-950 block">कुलदीप शर्मा (Kuldeep Sharma)</span>
-                  <span className="text-[10px] text-slate-500 block">राष्ट्रीय अध्यक्ष, समान अधिकार पार्टी</span>
-                  <span className="text-[9px] bg-emerald-100 text-emerald-900 px-2 py-0.5 rounded font-mono font-bold">
-                    DIGITALLY SIGNED & VERIFIED
-                  </span>
-                </div>
-              </div>
-
-            </div>
+            <OfficialReceiptCard
+              receipt={{
+                ...generatedReceipt,
+                donorState: generatedReceipt.donorState || donorState || "उत्तर प्रदेश"
+              }}
+              showActions={true}
+            />
           </div>
         )}
 
