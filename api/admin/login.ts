@@ -1,7 +1,6 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import bcrypt from "bcryptjs";
 
 function getJwtSecret(): string {
   if (process.env.JWT_SECRET && process.env.JWT_SECRET.trim().length >= 16) {
@@ -35,6 +34,33 @@ function readStoredCredentials(): { username: string; passwordHash?: string } | 
     } catch {}
   }
   return null;
+}
+
+async function verifyPasswordHash(plain: string, storedHash: string): Promise<boolean> {
+  if (!storedHash) return false;
+  if (storedHash.startsWith("scrypt:")) {
+    try {
+      const [, saltHex, hashHex] = storedHash.split(":");
+      if (!saltHex || !hashHex) return false;
+      const derived = crypto.scryptSync(plain, saltHex, 64);
+      const storedBuf = Buffer.from(hashHex, "hex");
+      return derived.length === storedBuf.length && crypto.timingSafeEqual(derived, storedBuf);
+    } catch {
+      return false;
+    }
+  }
+  if (storedHash.startsWith("$2")) {
+    try {
+      const mod: any = await import("bcryptjs");
+      const compare = mod?.compare || mod?.default?.compare;
+      if (typeof compare === "function") {
+        return await compare(plain, storedHash);
+      }
+    } catch {
+      return false;
+    }
+  }
+  return false;
 }
 
 export default async function handler(req: any, res: any) {
@@ -74,11 +100,10 @@ export default async function handler(req: any, res: any) {
     let resolvedUsername = envUser;
 
     if (stored && username.toLowerCase() === String(stored.username).trim().toLowerCase()) {
-      isValid = await bcrypt.compare(password, String(stored.passwordHash));
+      isValid = await verifyPasswordHash(password, String(stored.passwordHash || ""));
       resolvedUsername = stored.username;
     }
 
-    // Also allow configured env credentials when stored hash is unavailable or overridden by env
     if (!isValid && username.toLowerCase() === envUser.toLowerCase() && password === envPass) {
       isValid = true;
       resolvedUsername = envUser;

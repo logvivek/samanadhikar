@@ -1,7 +1,6 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import bcrypt from "bcryptjs";
 
 function getJwtSecret(): string {
   if (process.env.JWT_SECRET && process.env.JWT_SECRET.trim().length >= 16) {
@@ -56,6 +55,39 @@ function writeDb(db: any) {
   } catch {}
 }
 
+async function verifyPasswordHash(plain: string, storedHash: string): Promise<boolean> {
+  if (!storedHash) return false;
+  if (storedHash.startsWith("scrypt:")) {
+    try {
+      const [, saltHex, hashHex] = storedHash.split(":");
+      if (!saltHex || !hashHex) return false;
+      const derived = crypto.scryptSync(plain, saltHex, 64);
+      const storedBuf = Buffer.from(hashHex, "hex");
+      return derived.length === storedBuf.length && crypto.timingSafeEqual(derived, storedBuf);
+    } catch {
+      return false;
+    }
+  }
+  if (storedHash.startsWith("$2")) {
+    try {
+      const mod: any = await import("bcryptjs");
+      const compare = mod?.compare || mod?.default?.compare;
+      if (typeof compare === "function") {
+        return await compare(plain, storedHash);
+      }
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+
+function hashPasswordScrypt(plain: string): string {
+  const salt = crypto.randomBytes(16).toString("hex");
+  const derived = crypto.scryptSync(plain, salt, 64).toString("hex");
+  return `scrypt:${salt}:${derived}`;
+}
+
 export default async function handler(req: any, res: any) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -89,7 +121,7 @@ export default async function handler(req: any, res: any) {
     const envPass = (process.env.ADMIN_PASSWORD || "admin123").trim();
     const storedHash = db?.adminCredentials?.passwordHash;
     const isCurrentValid = storedHash
-      ? (await bcrypt.compare(String(currentPassword).trim(), storedHash)) || String(currentPassword).trim() === envPass
+      ? (await verifyPasswordHash(String(currentPassword).trim(), String(storedHash))) || String(currentPassword).trim() === envPass
       : String(currentPassword).trim() === envPass;
 
     if (!isCurrentValid) {
@@ -102,10 +134,9 @@ export default async function handler(req: any, res: any) {
       return res.status(400).json({ success: false, error: "यूज़रनेम >= 3 व पासवर्ड >= 6 अक्षर का होना चाहिए।" });
     }
 
-    const passwordHash = await bcrypt.hash(trimmedPass, 10);
     db.adminCredentials = {
       username: trimmedUser,
-      passwordHash,
+      passwordHash: hashPasswordScrypt(trimmedPass),
       updatedAt: new Date().toISOString()
     };
     writeDb(db);

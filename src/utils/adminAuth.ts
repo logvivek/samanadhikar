@@ -5,6 +5,18 @@ export interface LoginResult {
   error?: string;
 }
 
+async function fetchWithRetry(url: string, options: RequestInit, retries = 1): Promise<Response> {
+  try {
+    return await fetch(url, options);
+  } catch (err) {
+    if (retries > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      return fetchWithRetry(url, options, retries - 1);
+    }
+    throw err;
+  }
+}
+
 export async function loginAdmin(usernameInput: string, passwordInput: string): Promise<LoginResult> {
   const username = usernameInput.trim();
   const password = passwordInput.trim();
@@ -17,7 +29,7 @@ export async function loginAdmin(usernameInput: string, passwordInput: string): 
   }
 
   try {
-    const res = await fetch("/api/admin/login", {
+    const res = await fetchWithRetry("/api/admin/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password })
@@ -36,11 +48,12 @@ export async function loginAdmin(usernameInput: string, passwordInput: string): 
       success: false,
       error: data?.error || (res.ok ? "अवैध एडमिन यूज़रनेम या पासवर्ड।" : `सर्वर त्रुटि (${res.status}): कृपया पुनः प्रयास करें।`)
     };
-  } catch (err) {
+  } catch (err: any) {
     console.error("Login request failed:", err);
+    const detail = err?.message ? ` (${err.message})` : "";
     return {
       success: false,
-      error: "सर्वर से संपर्क नहीं हो सका। कृपया इंटरनेट जांचें।"
+      error: `सर्वर से संपर्क नहीं हो सका। कृपया पेज रिफ्रेश कर पुनः प्रयास करें${detail}`
     };
   }
 }
@@ -51,7 +64,7 @@ export async function verifyAdminToken(token: string): Promise<boolean> {
   }
 
   try {
-    const res = await fetch("/api/admin/verify", {
+    const res = await fetchWithRetry("/api/admin/verify", {
       headers: {
         "Authorization": `Bearer ${token}`,
         "X-Admin-Token": token
