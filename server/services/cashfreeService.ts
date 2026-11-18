@@ -25,7 +25,7 @@ import { addMember, getMembers } from "../database/repositories/memberRepository
 import { getPartyInfo } from "../database/repositories/partyRepository";
 
 export const SERVER_MEMBERSHIP_PRICING: Record<string, number> = {
-  "साधारण सदस्य": 10,
+  "साधारण सदस्य": 100,
   "सक्रिय सदस्य": 275,
   "सक्रिय सहयोग सदस्यता": 500
 };

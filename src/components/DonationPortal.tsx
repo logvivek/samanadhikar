@@ -823,7 +823,6 @@ export const DonationPortal: React.FC<DonationPortalProps> = ({
                   <input
                     type="text"
                     required={!isAnonymous}
-                    placeholder="उदा. राहुल शर्मा"
                     value={donorName}
                     onChange={(e) => setDonorName(e.target.value)}
                     disabled={isAnonymous}

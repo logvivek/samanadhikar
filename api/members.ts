@@ -101,7 +101,7 @@ export default async function handler(req: any, res: any) {
         membershipTier: membershipTier || "सक्रिय सदस्य (Active Member)",
         interests: Array.isArray(interests) && interests.length > 0 ? interests : ["समान अधिकार अभियान", "गुरुकुल योजना"],
         joinedDate: new Date().toISOString().split("T")[0],
-        membershipFee: 10,
+        membershipFee: 100,
         isFeePaid: true
       };
 

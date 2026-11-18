@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 const SERVER_MEMBERSHIP_PRICING: Record<string, number> = {
-  "साधारण सदस्य": 10,
+  "साधारण सदस्य": 100,
   "सक्रिय सदस्य": 275,
   "सक्रिय सहयोग सदस्यता": 500
 };

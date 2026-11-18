@@ -38,13 +38,13 @@ import {
 import { load as loadCashfree } from "@cashfreepayments/cashfree-js";
 
 const TIER_FEE_MAP: Record<string, number> = {
-  "साधारण सदस्य": 10,
+  "साधारण सदस्य": 100,
   "सक्रिय सदस्य": 275,
   "सक्रिय सहयोग सदस्यता": 500
 };
 
 const FEE_TIER_MAP: Record<number, string> = {
-  10: "साधारण सदस्य",
+  100: "साधारण सदस्य",
   275: "सक्रिय सदस्य",
   500: "सक्रिय सहयोग सदस्यता"
 };
@@ -77,7 +77,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
   const [phone, setPhone] = useState<string>("");
   const [precinct, setPrecinct] = useState<string>(PRECINCTS_LIST[0]);
   const [membershipTier, setMembershipTier] = useState<string>("साधारण सदस्य");
-  const [membershipFee, setMembershipFee] = useState<number>(10);
+  const [membershipFee, setMembershipFee] = useState<number>(100);
   const [isCustomFee, setIsCustomFee] = useState<boolean>(false);
   const [statutoryDeclaration, setStatutoryDeclaration] = useState<boolean>(true);
   
@@ -122,7 +122,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
     const payeeName = encodeURIComponent("Samanadhikar Party");
     const txnRef = generateMemberTxnRef(prefix);
     const txnNote = encodeURIComponent(noteOverride || "Member Registration");
-    const amtStr = membershipFee && Number(membershipFee) > 0 ? Number(membershipFee).toFixed(2) : "10.00";
+    const amtStr = membershipFee && Number(membershipFee) > 0 ? Number(membershipFee).toFixed(2) : "100.00";
 
     return `pa=${payeeVpa}` +
       `&pn=${payeeName}` +
@@ -505,7 +505,6 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
                     <input
                       type="text"
                       required
-                      placeholder="उदा. अमित भारद्वाज"
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
                       className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:border-orange-500 outline-none transition-all"
@@ -552,7 +551,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
                       type="button"
                       onClick={() => {
                         setMembershipTier("साधारण सदस्य");
-                        setMembershipFee(10);
+                        setMembershipFee(100);
                         setIsCustomFee(false);
                       }}
                       className={`p-3.5 rounded-2xl border-2 text-left transition-all cursor-pointer ${
@@ -562,7 +561,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onCloseModal }) => {
                       }`}
                     >
                       <span className="font-black text-sm block">साधारण सदस्य</span>
-                      <span className="text-xs text-orange-600 font-black block mt-0.5">₹10 शुल्क</span>
+                      <span className="text-xs text-orange-600 font-black block mt-0.5">₹100 शुल्क</span>
                       <span className="text-[10px] text-slate-500 block mt-1">प्राथमिक सदस्यता कार्ड</span>
                     </button>
 
