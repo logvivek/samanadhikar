@@ -66,8 +66,16 @@ export default async function handler(req: any, res: any) {
     const db = readDb();
 
     if (req.method === "GET") {
-      const events = Array.isArray(db.events) ? db.events : [];
+      const isArchive = req.query?.mode === "archive" || String(req.url || "").includes("/archive");
       const archived = Array.isArray(db.archivedEvents) ? db.archivedEvents : [];
+      if (isArchive) {
+        return res.status(200).json({
+          success: true,
+          count: archived.length,
+          archivedEvents: archived
+        });
+      }
+      const events = Array.isArray(db.events) ? db.events : [];
       return res.status(200).json({
         success: true,
         count: events.length,

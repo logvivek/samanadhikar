@@ -66,8 +66,16 @@ export default async function handler(req: any, res: any) {
     const db = readDb();
 
     if (req.method === "GET") {
-      const pressReleases = Array.isArray(db.pressReleases) ? db.pressReleases : [];
+      const isArchive = req.query?.mode === "archive" || String(req.url || "").includes("/archive");
       const archivedPRs = Array.isArray(db.archivedPressReleases) ? db.archivedPressReleases : [];
+      if (isArchive) {
+        return res.status(200).json({
+          success: true,
+          count: archivedPRs.length,
+          archivedPressReleases: archivedPRs
+        });
+      }
+      const pressReleases = Array.isArray(db.pressReleases) ? db.pressReleases : [];
       return res.status(200).json({
         success: true,
         count: pressReleases.length,

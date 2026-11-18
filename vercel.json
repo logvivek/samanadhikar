@@ -1,8 +1,9 @@
 {
   "rewrites": [
-    {
-      "source": "/((?!api/).*)",
-      "destination": "/index.html"
-    }
+    { "source": "/api/press-releases/archive", "destination": "/api/press-releases?mode=archive" },
+    { "source": "/api/events/archive", "destination": "/api/events?mode=archive" },
+    { "source": "/api/cashfree/payment-status/:orderId", "destination": "/api/cashfree/order-status/:orderId" },
+    { "source": "/api/cashfree/transactions", "destination": "/api/cashfree/verify-order?mode=transactions" },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
