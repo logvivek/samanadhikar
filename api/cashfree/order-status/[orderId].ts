@@ -258,7 +258,7 @@ export default async function handler(req: any, res: any) {
         phone: savedTx?.customerMobile || "",
         precinct: savedTx?.memberData?.precinct || "आगरा (Agra)",
         membershipTier: savedTx?.memberData?.membershipTier || "साधारण सदस्य",
-        membershipFee: cfAmount || 100,
+        membershipFee: cfAmount || 10,
         joinedDate: new Date().toISOString().split("T")[0],
         memberCardId: `SAP-2026-${Math.floor(1000 + Math.random() * 9000)}`,
         paymentMethod,
